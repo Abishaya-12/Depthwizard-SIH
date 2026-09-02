@@ -1,21 +1,30 @@
-<!--
-  This page shows the result after processing.
-
-  TODO (Charis): once You + Dalston's process_depth() actually produces
-  a real 3D render/screenshot, display it properly here instead of
-  just a text link. Also add a "process another image" button that
-  links back to "/".
--->
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DepthWizard — Result</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DepthWizard | Preview</title>
+  <style>
+    :root { font-family: Georgia, serif; color: #17231f; background: #e8eee8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 24px; background: radial-gradient(circle at 15% 10%, #d0dfc7, transparent 35%), #e8eee8; }
+    main { width: min(900px, 100%); margin: 5vh auto; }
+    .eyebrow { color: #637568; font: 700 12px Arial, sans-serif; letter-spacing: 2px; text-transform: uppercase; }
+    h1 { margin: 14px 0 10px; font-size: clamp(40px, 7vw, 68px); font-weight: 400; line-height: .95; }
+    p { color: #52635a; font: 16px/1.5 Arial, sans-serif; }
+    .status { display: inline-block; margin-top: 4px; padding: 8px 10px; color: #235842; background: #dce9d8; font: 700 12px Arial, sans-serif; letter-spacing: 1px; text-transform: uppercase; }
+    figure { margin: 32px 0 24px; padding: 12px; background: #f8f7f0; border: 1px solid #c6d0c4; }
+    img { display: block; width: 100%; max-height: 62vh; object-fit: contain; background: #dce6d9; }
+    a { display: inline-block; padding: 14px 20px; color: #f8f7f0; background: #235842; font: 700 14px Arial, sans-serif; text-decoration: none; }
+  </style>
 </head>
 <body>
-    <h1>Processing complete</h1>
-    <p>Result saved at: {{ result_image }}</p>
-
-    <!-- TODO (Charis): once results are real images, show them with
-         something like: <img src="{{ result_image }}" width="600"> -->
+  <main>
+    <p class="eyebrow">DepthWizard / preview ready</p>
+    <h1>Your depth preview</h1>
+    <div class="status">{{ result_type }}</div>
+    <p><strong>{{ source_name }}</strong> is ready for visualization. The current prototype displays the source texture while depth inference and elevation calibration are being integrated.</p>
+    <figure><img src="{{ url_for('output_file', filename=result_image) }}" alt="Generated depth preview"></figure>
+    <a href="{{ url_for('index') }}">Process another image</a>
+  </main>
 </body>
 </html>

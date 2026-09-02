@@ -18,9 +18,9 @@ HOW TO RUN THIS:
 
 import os
 import uuid
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, send_from_directory
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=".")
 
 # Folders where uploaded photos and generated results get saved.
 UPLOAD_FOLDER = "uploads"
@@ -32,7 +32,7 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 # The problem statement says: PNG, JPG, or TIFF.
 # Fill in this set with the correct lowercase extensions (no dots), e.g. "png".
 # ---------------------------------------------------------------------------
-ALLOWED_EXTENSIONS = {}  # <-- TODO: e.g. {"png", "jpg", "jpeg", "tif", "tiff"}
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "tif", "tiff"}
 
 
 def allowed_file(filename):
@@ -44,13 +44,7 @@ def allowed_file(filename):
     last dot, lowercased, and you need to check it's in ALLOWED_EXTENSIONS.
     "." in filename tells you there IS an extension at all.
     """
-    # ---------------------------------------------------------------------
-    # TODO (Gyani): implement this check.
-    # Example approach:
-    #   return "." in filename and \
-    #       filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-    # ---------------------------------------------------------------------
-    return False  # <-- replace this line
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def process_depth(image_path):
@@ -104,14 +98,28 @@ def upload():
     #   extension = file.filename.rsplit(".", 1)[1]
     #   unique_name = f"{uuid.uuid4().hex}.{extension}"
     # -----------------------------------------------------------------
-    unique_name = file.filename  # <-- TODO: replace with a unique name
+    extension = file.filename.rsplit(".", 1)[1].lower()
+    unique_name = f"{uuid.uuid4().hex}.{extension}"
 
     save_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_name)
     file.save(save_path)
 
     result_path = process_depth(save_path)
+    mode = request.form.get("mode", "relative")
+    result_type = "Absolute DSM" if mode == "absolute" else "Relative DSM"
 
-    return render_template("result.html", result_image=result_path)
+    return render_template(
+        "Result.html",
+        result_image=os.path.basename(result_path),
+        result_type=result_type,
+        source_name=file.filename,
+    )
+
+
+@app.route("/outputs/<path:filename>")
+def output_file(filename):
+    """Serves generated preview images to the result page."""
+    return send_from_directory(OUTPUT_FOLDER, filename)
 
 
 if __name__ == "__main__":
