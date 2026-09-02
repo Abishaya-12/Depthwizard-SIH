@@ -26,7 +26,9 @@ The Flask prototype currently provides the application shell:
 - Stores uploads with unique names and displays a processed preview.
 - Serves the generated preview through a result page.
 
-The current `process_depth()` function copies the source image as a placeholder. It does not yet run depth inference, read GeoTIFF metadata, calibrate metric elevation, or create a 3D mesh.
+`process_depth()` now runs the pretrained Depth Anything V2 Small model, normalizes non-georeferenced depth to relative height, calibrates georeferenced depth against a local SRTM GeoTIFF using linear regression, and writes a texture-colored Matplotlib 3D surface render. Model weights are downloaded by Transformers on first inference; no training or fine-tuning is performed.
+
+For absolute DSM processing, provide a valid local SRTM GeoTIFF with CRS metadata. The default location is `srtm.tif` in the project directory, or set `SRTM_PATH` to another local file. The app does not download elevation data.
 
 ## Run Locally
 

@@ -1,1 +1,8 @@
 flask
+matplotlib
+numpy
+Pillow
+rasterio
+scikit-learn
+torch
+transformers
