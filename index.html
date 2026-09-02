@@ -1,0 +1,28 @@
+<!--
+  This is the upload page — the first thing a user sees.
+
+  TODO (Charis): this form currently works but has zero styling and
+  no instructions. Make it look like a real app:
+    - Add a heading explaining what DepthWizard does (a sentence or two)
+    - Style it a little (colors, spacing — inline <style> below is fine
+      for a prototype, doesn't need to be fancy)
+    - Add a hint text near the file input saying which file types
+      are accepted (PNG, JPG, TIFF)
+-->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DepthWizard</title>
+    <style>
+        /* TODO (Charis): add your styling here */
+    </style>
+</head>
+<body>
+    <!-- TODO (Charis): add a heading + short description above the form -->
+
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="photo">
+        <button type="submit">Upload and Process</button>
+    </form>
+</body>
+</html>
