@@ -4,7 +4,155 @@
 
 # Run and deploy your AI Studio app
 
-This contains everything you need to run your app locally.
+DepthWizard
+
+DepthWizard is an interactive ISRO-inspired digital elevation model (DEM) workspace. It combines a React operations interface, a Flask upload API, and a shared Three.js terrain engine for inspecting generated terrain and flying through the same terrain path.
+
+## What It Can Do
+
+- Guide an operator through a five-stage DEM workflow:
+   1. Welcome portal
+   2. DEM ingestion and configuration
+   3. Mesh processing telemetry
+   4. Interactive 3D DEM viewport
+   5. 3D terrain flythrough
+- Upload a relative DEM and an absolute/georeferenced DEM from the browser.
+- Validate supported file extensions and enforce the 1 GB combined upload limit.
+- Calculate SHA-256 hashes and file sizes on the backend.
+- Inspect raster dimensions and band counts when Rasterio can decode the uploaded format.
+- Return processing metadata to the frontend through a Flask JSON API.
+- Display backend-derived mesh triangles, survey area, relief range, interpolation method, and resolution in the mesh screen.
+- Generate a procedural 3D terrain surface with crater, ridge, and fine relief features.
+- Render the terrain with Three.js lighting, shading, grid references, wireframe mode, and elevation exaggeration.
+- Reuse the same terrain engine and generated Catmull-Rom path in the DEM viewer and flythrough screens.
+- Animate a flythrough camera along the shared path with autopilot and speed controls.
+- Provide viewer controls for camera presets, orbit rotation, render modes, solar settings, and terrain exaggeration.
+- Provide flythrough controls for chase, cockpit, orbit, and top-down modes, keyboard steering, autopilot, speed multipliers, and waypoint pinning.
+- Adapt the interface to desktop and mobile layouts.
+
+## Architecture
+
+```text
+Browser
+   React/Vite frontend :3000
+          |
+          | /api proxy during development
+          v
+   Flask backend :5000
+          |
+          +-- validates and hashes uploads
+          +-- reads raster metadata with Rasterio when available
+
+src/script.js
+   Shared Three.js terrain engine
+          +-- generated terrain mesh
+          +-- lighting and grid
+          +-- shared flythrough path
+          +-- viewer and flythrough animation lifecycle
+```
+
+The authoritative 3D terrain and flythrough logic lives in [`src/script.js`](../src/script.js). The React screens import `createTerrainEngine` rather than maintaining separate terrain renderers. The React HUD and workflow state remain in `frontend/src`.
+
+## Requirements
+
+- Node.js 18 or newer
+- Python 3.10 or newer
+- A browser with WebGL support
+
+Python dependencies are listed in [`requirements.txt`](../requirements.txt). Frontend dependencies are listed in [`package.json`](./package.json).
+
+## Setup
+
+From the repository root:
+
+```powershell
+python -m pip install -r requirements.txt
+Push-Location frontend
+npm install
+Pop-Location
+```
+
+## Run Locally
+
+Start the Flask API in one terminal:
+
+```powershell
+python backend.py
+```
+
+The API runs at `http://127.0.0.1:5000`.
+
+Start the React frontend in another terminal:
+
+```powershell
+Push-Location frontend
+npm run dev
+Pop-Location
+```
+
+Open `http://localhost:3000/`. Vite proxies `/api` requests to the Flask server.
+
+## Frontend Commands
+
+Run these from `frontend`:
+
+```powershell
+npm run dev       # Start the Vite development server
+npm run lint      # Run the TypeScript check
+npm run build     # Create a production build
+npm run preview   # Preview the production build
+```
+
+## API
+
+### Health check
+
+```http
+GET /api/health
+```
+
+Example response:
+
+```json
+{
+   "status": "ok",
+   "service": "depthwizard-dem-api"
+}
+```
+
+### Process DEM files
+
+```http
+POST /api/process-dem
+Content-Type: multipart/form-data
+```
+
+Required form fields:
+
+- `relative_dem`: `.tif`, `.tiff`, `.img`, `.hdf5`, `.h5`, or `.dem`
+- `absolute_dem`: `.dem`, `.tif`, `.tiff`, `.las`, or `.laz`
+
+The response includes a generated job ID, validation status, metadata for both files, and the processing result used by the mesh telemetry screen. Files are written to temporary storage only while they are inspected and are removed after the request finishes.
+
+## Project Layout
+
+```text
+backend.py                 Flask upload and metadata API
+requirements.txt           Python dependencies
+src/script.js              Shared Three.js terrain and flythrough engine
+src/index.html             Standalone legacy Three.js page
+src/style.css              Standalone renderer styles
+frontend/src/App.tsx       React workflow shell
+frontend/src/api.ts        Frontend API client
+frontend/src/components/   Workflow, viewer, and flythrough screens
+frontend/src/types.ts      Shared frontend response types
+frontend/vite.config.ts    Vite configuration and API proxy
+static/                    Standalone renderer texture assets
+```
+
+## Current Scope
+
+The Flask endpoint currently validates, hashes, and inspects uploads, then returns the processing metadata contract used by the UI. The Three.js engine currently generates a procedural terrain surface and shared flythrough path. A production raster-to-mesh pipeline can replace the backend result generation while preserving the existing frontend API contract and engine mount points.
 
 View your app in AI Studio: https://ai.studio/apps/7e556b88-b6db-41af-89d1-1d97b0459f45
 
