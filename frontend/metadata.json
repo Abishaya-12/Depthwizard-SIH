@@ -1,0 +1,6 @@
+{
+  "name": "DepthWizard - ISRO 3D DEM Explorer",
+  "description": "ISRO Lunar & Planetary Digital Elevation Model (DEM) Synthesizer with stereoscopic ingestion, 3D spatial viewport, and real-time flythrough trajectory simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

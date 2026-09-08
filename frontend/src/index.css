@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #0d141d;
+  --color-surface-dim: #0d141d;
+  --color-surface-bright: #333a44;
+  --color-surface-container-lowest: #080f18;
+  --color-surface-container-low: #151c26;
+  --color-surface-container: #19202a;
+  --color-surface-container-high: #242a34;
+  --color-surface-container-highest: #2e353f;
+  --color-primary: #c3f5ff;
+  --color-primary-container: #00e5ff;
+  --color-primary-fixed: #9cf0ff;
+  --color-primary-fixed-dim: #00daf3;
+  --color-on-primary: #00363d;
+  --color-on-primary-container: #00626e;
+  --color-secondary: #4cd6fb;
+  --color-secondary-container: #00b2d6;
+  --color-secondary-fixed: #b3ebff;
+  --color-secondary-fixed-dim: #4cd6fb;
+  --color-on-secondary: #003642;
+  --color-on-secondary-container: #003f4e;
+  --color-tertiary: #e1eeff;
+  --color-tertiary-container: #b6d4f4;
+  --color-on-surface: #dce3f0;
+  --color-on-surface-variant: #bac9cc;
+  --color-outline: #849396;
+  --color-outline-variant: #3b494c;
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+
+  --spacing-space-2xs: 0.125rem;
+  --spacing-space-xs: 0.25rem;
+  --spacing-space-sm: 0.5rem;
+  --spacing-space-md: 1rem;
+  --spacing-space-lg: 1.5rem;
+  --spacing-space-xl: 2rem;
+  --spacing-space-2xl: 3rem;
+  --spacing-space-3xl: 4rem;
+  --spacing-gutter: 1rem;
+}
+
+/* Custom font styling matching design system specifications */
+.font-display-lg { font-family: 'Space Grotesk', sans-serif; }
+.font-headline-lg { font-family: 'Space Grotesk', sans-serif; }
+.font-headline-md { font-family: 'Space Grotesk', sans-serif; }
+.font-headline-sm { font-family: 'Space Grotesk', sans-serif; }
+.font-body-lg { font-family: 'Inter', sans-serif; }
+.font-body-md { font-family: 'Inter', sans-serif; }
+.font-body-sm { font-family: 'Inter', sans-serif; }
+.font-mono-telemetry { font-family: 'JetBrains Mono', monospace; }
+.font-mono-coordinate { font-family: 'JetBrains Mono', monospace; }
+.font-label-caps { font-family: 'JetBrains Mono', monospace; }
+
+.text-display-lg { font-size: 56px; line-height: 64px; letter-spacing: -0.02em; font-weight: 600; }
+.text-headline-lg { font-size: 32px; line-height: 40px; letter-spacing: -0.01em; font-weight: 600; }
+.text-headline-md { font-size: 24px; line-height: 32px; letter-spacing: 0em; font-weight: 500; }
+.text-headline-sm { font-size: 18px; line-height: 24px; letter-spacing: 0.01em; font-weight: 500; }
+.text-body-lg { font-size: 16px; line-height: 24px; letter-spacing: 0em; font-weight: 400; }
+.text-body-md { font-size: 14px; line-height: 20px; letter-spacing: 0.01em; font-weight: 400; }
+.text-body-sm { font-size: 12px; line-height: 16px; letter-spacing: 0.02em; font-weight: 400; }
+.text-mono-telemetry { font-size: 13px; line-height: 18px; letter-spacing: 0.04em; font-weight: 500; }
+.text-mono-coordinate { font-size: 11px; line-height: 14px; letter-spacing: 0.08em; font-weight: 400; }
+.text-label-caps { font-size: 10px; line-height: 12px; letter-spacing: 0.12em; font-weight: 600; }
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0d141d;
+  color: #dce3f0;
+  overscroll-behavior: none;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.perspective-stage {
+  perspective: 1100px;
+}

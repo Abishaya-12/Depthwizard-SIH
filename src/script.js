@@ -1,140 +1,125 @@
-import './style.css'
 import * as THREE from 'three'
-//import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import * as dat from 'dat.gui'
 
-//Texture Loader
-const loader = new THREE.TextureLoader()
-const texture = loader.load('/texture.jpg')
-const height = loader.load('/height.jpg')
-const alpha = loader.load('/alpha.jpg')
-// Debug
-const gui = new dat.GUI()
+const DEFAULTS = { width: 14, depth: 14, segments: 160 }
 
-// Canvas
-const canvas = document.querySelector('canvas.webgl')
-
-// Scene
-const scene = new THREE.Scene()
-
-// Objects
-const geometry = new THREE.PlaneBufferGeometry(5, 5, 256, 256)
-
-// Materials
-const material = new THREE.MeshStandardMaterial({
-    color: 'gray',
-    map: texture,
-    displacementMap: height,
-    displacementScale: 0.2,
-    alphaMap: alpha,
-    transparent: true,
-    depthTest: false
-
-})
-const plane = new THREE.Mesh(geometry, material)
-plane.rotation.x = -Math.PI * 0.5
-scene.add(plane)
-
-gui.add(plane.position, 'x').min(-3).max(3).step(0.01).name('Plane X')
-gui.add(plane.position, 'y').min(-3).max(3).step(0.01).name('Plane Height')
-gui.add(plane.rotation, 'x').min(-Math.PI).max(Math.PI).step(0.01).name('Plane Tilt')
-gui.add(material, 'displacementScale').min(0).max(1).step(0.01).name('Displacement')
-
-// Mesh
-
-
-// Lights
-
-const pointLight = new THREE.PointLight('#00f5af', 6, 10, 1)
-pointLight.position.x = 2
-pointLight.position.y = 3
-pointLight.position.z = 4
-scene.add(pointLight)
-
-gui.add(pointLight, 'intensity').min(0).max(1).step(0.01).name('Light Intensity')
-gui.add(pointLight.position, 'x').min(-10).max(10).step(0.01)
-gui.add(pointLight.position, 'y').min(-10).max(10).step(0.01)
-gui.add(pointLight.position, 'z').min(-10).max(10).step(0.01)
-
-const col = {color: '#ffffff'}
-gui.addColor(col, 'color').onChange(() => {
-    pointLight.color.set(col.color)
-})
-/**
- * Sizes
- */
-const sizes = {
-    width: window.innerWidth,
-    height: window.innerHeight
+function terrainHeight(x, z) {
+    const crater = Math.exp(-((x + 2.3) ** 2 + (z - 0.8) ** 2) * 0.18)
+    const ridge = Math.sin(x * 1.1) * 0.32 + Math.cos(z * 1.4) * 0.24
+    const detail = Math.sin(x * 3.8 + z) * Math.cos(z * 3.2) * 0.12
+    return (ridge + detail - crater * 0.9) * 1.8
 }
 
-window.addEventListener('resize', () =>
-{
-    // Update sizes
-    sizes.width = window.innerWidth
-    sizes.height = window.innerHeight
+function buildTerrainGeometry(options) {
+    const geometry = new THREE.PlaneGeometry(options.width, options.depth, options.segments, options.segments)
+    const positions = geometry.attributes.position
+    for (let index = 0; index < positions.count; index += 1) {
+        positions.setZ(index, terrainHeight(positions.getX(index), positions.getY(index)))
+    }
+    positions.needsUpdate = true
+    geometry.computeVertexNormals()
+    return geometry
+}
 
-    // Update camera
-    camera.aspect = sizes.width / sizes.height
-    camera.updateProjectionMatrix()
+export function createTerrainEngine(container, config = {}) {
+    const options = { ...DEFAULTS, ...config }
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color('#050b14')
+    const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100)
+    camera.position.set(8, 7, 9)
+    camera.lookAt(0, 0, 0)
 
-    // Update renderer
-    renderer.setSize(sizes.width, sizes.height)
+    const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-})
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+    container.replaceChildren(renderer.domElement)
+    renderer.domElement.style.cssText = 'width:100%;height:100%;display:block'
 
-/**
- * Camera
- */
-// Base camera
-const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 100)
-camera.position.x = 0
-camera.position.y = 3
-camera.position.z = 4
-camera.lookAt(0, 0, 0)
+    const terrain = new THREE.Mesh(
+        buildTerrainGeometry(options),
+        new THREE.MeshStandardMaterial({ color: '#6bc8d8', roughness: 0.82, metalness: 0.05, wireframe: config.wireframe ?? false }),
+    )
+    terrain.rotation.x = -Math.PI / 2
+    scene.add(terrain)
 
-scene.add(camera)
+    const grid = new THREE.GridHelper(options.width, 28, '#16879a', '#0d3745')
+    grid.position.y = -1.7
+    scene.add(grid)
+    const sun = new THREE.DirectionalLight('#c3f5ff', 3.2)
+    sun.position.set(4, 8, 5)
+    scene.add(sun, new THREE.AmbientLight('#1a5260', 1.8))
 
-// Controls
-// const controls = new OrbitControls(camera, canvas)
-// controls.enableDamping = true
+    const path = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-5, 2.5, 5), new THREE.Vector3(-2, 2, 2),
+        new THREE.Vector3(1, 2.3, 0), new THREE.Vector3(3, 2.1, -2),
+        new THREE.Vector3(5, 2.8, -5),
+    ])
+    const pathLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(path.getPoints(80)),
+        new THREE.LineBasicMaterial({ color: '#00e5ff', transparent: true, opacity: 0.8 }),
+    )
+    pathLine.position.y = 0.15
+    scene.add(pathLine)
 
-/**
- * Renderer
- */
-const renderer = new THREE.WebGLRenderer({
-    canvas: canvas,
-    alpha: true
-})
-renderer.setSize(sizes.width, sizes.height)
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    const drone = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }))
+    scene.add(drone)
+    let frameId = 0
+    let destroyed = false
+    let autoRotate = config.mode !== 'flythrough'
+    let speed = 0.04
+    let progress = 0
+    let orbit = 0
 
-/**
- * Animate
- */
+    function resize() {
+        const width = Math.max(container.clientWidth, 1)
+        const height = Math.max(container.clientHeight, 1)
+        camera.aspect = width / height
+        camera.updateProjectionMatrix()
+        renderer.setSize(width, height, false)
+    }
 
-document.addEventListener('mousemove', animateTerrain)
+    function render() {
+        if (destroyed) return
+        if (config.mode === 'flythrough' && autoRotate) {
+            progress = (progress + speed * 0.001) % 1
+            const point = path.getPointAt(progress)
+            camera.position.lerp(point.clone().add(new THREE.Vector3(0, 1.8, 0)), 0.08)
+            camera.lookAt(path.getPointAt((progress + 0.015) % 1))
+            drone.position.copy(point)
+        } else if (config.mode !== 'flythrough' && autoRotate) {
+            orbit += 0.0025
+            camera.position.set(Math.cos(orbit) * 10, 7, Math.sin(orbit) * 10)
+            camera.lookAt(0, 0, 0)
+        }
+        renderer.render(scene, camera)
+        frameId = window.requestAnimationFrame(render)
+    }
 
-let mouseY = 0
-function animateTerrain(event){
-    mouseY = event.clientY
+    const resizeObserver = new ResizeObserver(resize)
+    resizeObserver.observe(container)
+    resize()
+    render()
+
+    return {
+        scene, camera, renderer, terrain, path,
+        update(next = {}) {
+            if (typeof next.autoRotate === 'boolean') autoRotate = next.autoRotate
+            if (typeof next.speed === 'number') speed = Math.max(0, next.speed)
+            if (typeof next.wireframe === 'boolean') terrain.material.wireframe = next.wireframe
+            if (typeof next.displacementScale === 'number') terrain.scale.y = next.displacementScale
+        },
+        destroy() {
+            destroyed = true
+            window.cancelAnimationFrame(frameId)
+            resizeObserver.disconnect()
+            terrain.geometry.dispose()
+            terrain.material.dispose()
+            pathLine.geometry.dispose()
+            pathLine.material.dispose()
+            renderer.dispose()
+            container.replaceChildren()
+        },
+    }
 }
-const clock = new THREE.Clock()
 
-const tick = () =>
-{
-
-    const elapsedTime = clock.getElapsedTime()
-    // Update Orbital Controls
-    // controls.update()
-    plane.rotation.z = elapsedTime * 0.5
-    plane.material.displacementScale = .3 + mouseY * 0.0008
-
-    // Render
-    renderer.render(scene, camera)
-
-    // Call tick again on the next frame
-    window.requestAnimationFrame(tick)
-}
-
-tick()
+const legacyCanvas = document.querySelector('canvas.webgl')
+if (legacyCanvas?.parentElement) createTerrainEngine(legacyCanvas.parentElement, { mode: 'viewer' })
