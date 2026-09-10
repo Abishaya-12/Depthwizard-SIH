@@ -4,9 +4,10 @@ import { createTerrainEngine } from '../../../src/script.js';
 
 interface DemViewportProps {
   onNavigate: (tab: TabId) => void;
+  previewImage?: string | null;
 }
 
-export const DemViewport: React.FC<DemViewportProps> = ({ onNavigate }) => {
+export const DemViewport: React.FC<DemViewportProps> = ({ onNavigate, previewImage }) => {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const terrainRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<ReturnType<typeof createTerrainEngine> | null>(null);
@@ -29,9 +30,13 @@ export const DemViewport: React.FC<DemViewportProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     if (!terrainRef.current) return;
-    engineRef.current = createTerrainEngine(terrainRef.current, { mode: 'viewer', wireframe: true });
+    engineRef.current = createTerrainEngine(terrainRef.current, {
+      mode: 'viewer',
+      wireframe: true,
+      heightMap: previewImage ?? undefined,
+    });
     return () => engineRef.current?.destroy();
-  }, []);
+  }, [previewImage]);
 
   useEffect(() => {
     engineRef.current?.update({

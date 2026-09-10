@@ -4,9 +4,10 @@ import { DemProcessingResponse, TabId } from '../types';
 interface MeshProcessingProps {
   onNavigate: (tab: TabId) => void;
   processingResult: DemProcessingResponse | null;
+  previewImage?: string | null;
 }
 
-export const MeshProcessing: React.FC<MeshProcessingProps> = ({ onNavigate, processingResult }) => {
+export const MeshProcessing: React.FC<MeshProcessingProps> = ({ onNavigate, processingResult, previewImage }) => {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [elevationTickTop, setElevationTickTop] = useState('33%');
   const [radarPing, setRadarPing] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
@@ -124,7 +125,11 @@ export const MeshProcessing: React.FC<MeshProcessingProps> = ({ onNavigate, proc
               isZoomed ? 'scale-125' : 'scale-100 group-hover:scale-105'
             }`}
             style={{ 
-              backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuDfKs5zL7wXJ6uXlZ_HwzgVDkHfvNlni19TC2kY3EPAsdkcjkTNBXPupQzHGcXOG_zlEMkPRelYtOMLXJMyvg8QSRNsLcbUX85VXtRo7561SH53sIKrZpTLrP-zx17OE25DJf3EmpDNC06aHU6wFR8iDpkGiq7VNlqEanpVajq2H8hH1NskIOrv7wJAo6gUI7MeCmLA-RZh2hAnWZnhT9bAud3l892Qa611QPrKi6B96XdIyG3ID23h')`,
+              backgroundImage: previewImage
+                ? `url("${previewImage}")`
+                : `linear-gradient(45deg, rgba(255,255,255,0.14) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.14) 75%), linear-gradient(45deg, rgba(255,255,255,0.14) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.14) 75%), radial-gradient(circle at center, rgba(0,229,255,0.28), rgba(0,0,0,0.6) 42%, rgba(0,0,0,0.92))`,
+              backgroundSize: previewImage ? 'cover' : '28px 28px, 28px 28px, cover',
+              backgroundPosition: previewImage ? 'center' : '0 0, 14px 14px, center',
               transformOrigin: isZoomed ? `${zoomOrigin.x}% ${zoomOrigin.y}%` : 'center center'
             }}
           />
@@ -317,7 +322,7 @@ export const MeshProcessing: React.FC<MeshProcessingProps> = ({ onNavigate, proc
         <div className="p-4 rounded-xl bg-[#19202a]/60 backdrop-blur-md flex flex-col gap-1 shadow-md border border-[#3b494c]/20">
           <div className="flex items-center justify-between">
             <span className="font-label-caps text-[10px] text-[#bac9cc] uppercase tracking-wider">Orthorectification</span>
-            <span className="font-mono-coordinate text-[11px] text-[#00daf3]">Locked</span>
+            <span className="font-mono-coordinate text-[11px] text-[#00daf3]">Ready</span>
           </div>
           <div className="flex items-baseline gap-1 mt-1">
             <span className="font-headline-md text-[24px] text-[#dce3f0] font-bold">0.032</span>

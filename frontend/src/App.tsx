@@ -12,6 +12,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('welcome-portal');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [processingResult, setProcessingResult] = useState<DemProcessingResponse | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-[#0d141d] text-[#dce3f0] selection:bg-[#00e5ff] selection:text-[#00363d] flex flex-col font-body-md antialiased overflow-x-hidden">
@@ -58,19 +59,25 @@ export default function App() {
           )}
 
           {activeTab === 'setup-upload' && (
-            <SetupUpload onNavigate={setActiveTab} onProcessed={setProcessingResult} />
+            <SetupUpload
+              onNavigate={setActiveTab}
+              onProcessed={(result) => {
+                setProcessingResult(result);
+                setPreviewImage(result.previewImage ?? null);
+              }}
+            />
           )}
 
           {activeTab === 'map-generated' && (
-            <MeshProcessing onNavigate={setActiveTab} processingResult={processingResult} />
+            <MeshProcessing onNavigate={setActiveTab} processingResult={processingResult} previewImage={previewImage} />
           )}
 
           {activeTab === '3d-dem-viewer' && (
-            <DemViewport onNavigate={setActiveTab} />
+            <DemViewport onNavigate={setActiveTab} previewImage={previewImage} />
           )}
 
           {activeTab === '3d-flythrough' && (
-            <FlythroughPath onNavigate={setActiveTab} />
+            <FlythroughPath onNavigate={setActiveTab} previewImage={previewImage} />
           )}
         </main>
       </div>

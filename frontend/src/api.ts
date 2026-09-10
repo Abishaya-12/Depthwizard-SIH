@@ -1,12 +1,12 @@
 import { DemProcessingResponse } from './types';
 
 export async function processDemFiles(
-  relativeDem: File,
-  absoluteDem: File,
+  relativeDem?: File | null,
+  absoluteDem?: File | null,
 ): Promise<DemProcessingResponse> {
   const formData = new FormData();
-  formData.append('relative_dem', relativeDem);
-  formData.append('absolute_dem', absoluteDem);
+  if (relativeDem) formData.append('relative_dem', relativeDem);
+  if (absoluteDem) formData.append('absolute_dem', absoluteDem);
 
   const response = await fetch('/api/process-dem', {
     method: 'POST',

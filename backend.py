@@ -10,8 +10,8 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1_000 * 1024 * 1024
 
-ALLOWED_RELATIVE = {'.tif', '.tiff', '.img', '.hdf5', '.h5', '.dem'}
-ALLOWED_ABSOLUTE = {'.dem', '.tif', '.tiff', '.las', '.laz'}
+ALLOWED_RELATIVE = {'.png'}
+ALLOWED_ABSOLUTE = {'.dem', '.tif', '.tiff', '.las', '.laz', '.png'}
 
 
 def file_metadata(upload, allowed_extensions):
@@ -68,12 +68,17 @@ def health():
 def process_dem():
     relative_upload = request.files.get('relative_dem')
     absolute_upload = request.files.get('absolute_dem')
-    if relative_upload is None or absolute_upload is None:
-        return jsonify({'error': 'Both relative_dem and absolute_dem files are required.'}), 400
+    if relative_upload is None and absolute_upload is None:
+        return jsonify({'error': 'Provide at least one DEM file: relative_dem (PNG) or absolute_dem.'}), 400
+
+    relative = None
+    absolute = None
 
     try:
-        relative = file_metadata(relative_upload, ALLOWED_RELATIVE)
-        absolute = file_metadata(absolute_upload, ALLOWED_ABSOLUTE)
+        if relative_upload is not None:
+            relative = file_metadata(relative_upload, ALLOWED_RELATIVE)
+        if absolute_upload is not None:
+            absolute = file_metadata(absolute_upload, ALLOWED_ABSOLUTE)
     except ValueError as error:
         return jsonify({'error': str(error)}), 400
 

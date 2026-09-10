@@ -12,6 +12,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
   const [fileLayer2, setFileLayer2] = useState<{ name: string; size: string; verified: boolean } | null>(null);
   const [relativeFile, setRelativeFile] = useState<File | null>(null);
   const [absoluteFile, setAbsoluteFile] = useState<File | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const [datumModel, setDatumModel] = useState('Lunar Sphere R=1737.4 km');
   const [calibSource, setCalibSource] = useState('LOLA + CE-2 Altimetry');
@@ -24,6 +25,8 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
   const handleFile1Upload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const url = URL.createObjectURL(file);
+      setPreviewImage(url);
       setFileLayer1({
         name: file.name,
         size: `${(file.size / (1024 * 1024)).toFixed(1)} MB • 100% Verified • Raster Float`,
@@ -46,8 +49,8 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
   };
 
   const handleSynthesize = async () => {
-    if (!relativeFile || !absoluteFile) {
-      setError('Select both DEM files before starting synthesis.');
+    if (!relativeFile && !absoluteFile) {
+      setError('Select at least one DEM file before starting synthesis.');
       return;
     }
 
@@ -55,7 +58,10 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
     setError(null);
     try {
       const result = await processDemFiles(relativeFile, absoluteFile);
-      onProcessed(result);
+      onProcessed({
+        ...result,
+        previewImage: previewImage ?? result.previewImage ?? null,
+      });
       onNavigate('map-generated');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'DEM processing failed.');
@@ -76,14 +82,14 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
         ref={fileInput1Ref} 
         onChange={handleFile1Upload} 
         className="hidden" 
-        accept=".tif,.tiff,.img,.hdf5,.dem"
+        accept=".png"
       />
       <input 
         type="file" 
         ref={fileInput2Ref} 
         onChange={handleFile2Upload} 
         className="hidden" 
-        accept=".dem,.tif,.tiff,.las,.laz"
+        accept=".dem,.tif,.tiff,.las,.laz,.png"
       />
 
       {/* PIPELINE STEP INDICATOR */}
@@ -329,19 +335,18 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
 
             <div>
               <h3 className="font-headline-md text-[24px] text-[#dce3f0] tracking-tight">
-                Upload Relative DEM Height Map
+                Upload Relative DEM PNG
               </h3>
               <p className="font-body-md text-[14px] text-[#bac9cc] mt-1">
-                Direct ingestion of raw stereoscopic disparity elevation matrices, micro-relief surface textures, and crater morphology data.
+                Use a grayscale or height-map PNG as the relative DEM input for the terrain displacement surface.
               </p>
             </div>
 
             {/* Format tags */}
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="font-mono-coordinate text-[11px] px-2 py-1 rounded bg-[#2e353f] text-[#dce3f0] font-semibold">.TIFF / GeoTIFF</span>
-              <span className="font-mono-coordinate text-[11px] px-2 py-1 rounded bg-[#2e353f] text-[#dce3f0] font-semibold">.IMG (PDS4)</span>
-              <span className="font-mono-coordinate text-[11px] px-2 py-1 rounded bg-[#2e353f] text-[#dce3f0] font-semibold">.HDF5</span>
-              <span className="font-mono-coordinate text-[11px] px-2 py-1 rounded bg-[#242a34] text-[#849396]">MAX: 500 MB</span>
+              <span className="font-mono-coordinate text-[11px] px-2 py-1 rounded bg-[#2e353f] text-[#dce3f0] font-semibold">.PNG</span>
+              <span className="font-mono-coordinate text-[11px] px-2 py-1 rounded bg-[#2e353f] text-[#dce3f0] font-semibold">GREYSCALE / HEIGHT MAP</span>
+              <span className="font-mono-coordinate text-[11px] px-2 py-1 rounded bg-[#242a34] text-[#849396]">REPLACES HEIGHT SOURCE</span>
             </div>
 
             {/* Dropzone */}
@@ -504,7 +509,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
 
           <div className="mt-4 pt-2 flex items-center justify-between text-[#bac9cc] border-t border-[#3b494c]/20">
             <span className="font-mono-coordinate text-[11px] text-[#849396]">OFFSET DRIFT: &lt; 0.04m</span>
-            <span className="font-mono-coordinate text-[11px] text-[#c3f5ff] font-semibold">GEO-ANCHOR LOCKED</span>
+            <span className="font-mono-coordinate text-[11px] text-[#c3f5ff] font-semibold">SOURCE READY</span>
           </div>
         </div>
       </section>

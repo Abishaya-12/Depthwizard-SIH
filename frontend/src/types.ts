@@ -17,20 +17,21 @@ export interface IngestionFile {
 export interface DemProcessingResponse {
   jobId: string;
   status: 'complete';
-  relative: IngestionFile & {
+  relative?: IngestionFile & {
     bytes: number;
     sha256: string;
     width: number | null;
     height: number | null;
     bands: number | null;
-  };
-  absolute: IngestionFile & {
+  } | null;
+  absolute?: IngestionFile & {
     bytes: number;
     sha256: string;
     width: number | null;
     height: number | null;
     bands: number | null;
-  };
+  } | null;
+  previewImage?: string | null;
   result: {
     meshTriangles: number;
     surveyAreaKm2: number;

@@ -2,22 +2,77 @@ import * as THREE from 'three'
 
 const DEFAULTS = { width: 14, depth: 14, segments: 160 }
 
-function terrainHeight(x, z) {
+function defaultTerrainHeight(x, z) {
     const crater = Math.exp(-((x + 2.3) ** 2 + (z - 0.8) ** 2) * 0.18)
     const ridge = Math.sin(x * 1.1) * 0.32 + Math.cos(z * 1.4) * 0.24
     const detail = Math.sin(x * 3.8 + z) * Math.cos(z * 3.2) * 0.12
     return (ridge + detail - crater * 0.9) * 1.8
 }
 
+function getHeightFromImage(image, width, height, segments) {
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(2, width)
+    canvas.height = Math.max(2, height)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+    const values = []
+
+    for (let y = 0; y < canvas.height; y += 1) {
+        for (let x = 0; x < canvas.width; x += 1) {
+            const index = (y * canvas.width + x) * 4
+            const r = data[index]
+            const g = data[index + 1]
+            const b = data[index + 2]
+            const brightness = (r + g + b) / 765
+            values.push(brightness)
+        }
+    }
+
+    const heightValues = new Float32Array(segments * segments)
+    for (let i = 0; i < segments * segments; i += 1) {
+        const x = i % segments
+        const y = Math.floor(i / segments)
+        const sx = Math.min(canvas.width - 1, Math.floor((x / segments) * canvas.width))
+        const sy = Math.min(canvas.height - 1, Math.floor((y / segments) * canvas.height))
+        const sample = values[sy * canvas.width + sx]
+        heightValues[i] = (sample - 0.5) * 2.5
+    }
+    return heightValues
+}
+
 function buildTerrainGeometry(options) {
     const geometry = new THREE.PlaneGeometry(options.width, options.depth, options.segments, options.segments)
     const positions = geometry.attributes.position
+    const heightValues = options.heightValues || null
+
     for (let index = 0; index < positions.count; index += 1) {
-        positions.setZ(index, terrainHeight(positions.getX(index), positions.getY(index)))
+        const x = positions.getX(index)
+        const y = positions.getY(index)
+        const value = heightValues && index < heightValues.length ? heightValues[index] : defaultTerrainHeight(x, y)
+        positions.setZ(index, value)
     }
     positions.needsUpdate = true
     geometry.computeVertexNormals()
     return geometry
+}
+
+function applyHeightMap(terrain, imageSrc, options) {
+    if (!imageSrc) return
+
+    const image = new Image()
+    image.onload = () => {
+        const heightValues = getHeightFromImage(image, 256, 256, options.segments)
+        if (!heightValues) return
+
+        if (terrain.geometry) terrain.geometry.dispose()
+        terrain.geometry = buildTerrainGeometry({ ...options, heightValues })
+        terrain.geometry.computeVertexNormals()
+        terrain.geometry.needsUpdate = true
+    }
+    image.src = imageSrc
 }
 
 export function createTerrainEngine(container, config = {}) {
@@ -25,7 +80,26 @@ export function createTerrainEngine(container, config = {}) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color('#050b14')
     const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100)
-    camera.position.set(8, 7, 9)
+
+    const defaultCamera = {
+        position: new THREE.Vector3(8, 7, 9),
+        yaw: 0,
+        pitch: -0.35,
+    }
+
+    const flyState = {
+        position: defaultCamera.position.clone(),
+        yaw: defaultCamera.yaw,
+        pitch: defaultCamera.pitch,
+        drag: false,
+        lastX: 0,
+        lastY: 0,
+        speed: 0.24,
+        boost: 1,
+        keys: {},
+    }
+
+    camera.position.copy(flyState.position)
     camera.lookAt(0, 0, 0)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -34,12 +108,26 @@ export function createTerrainEngine(container, config = {}) {
     container.replaceChildren(renderer.domElement)
     renderer.domElement.style.cssText = 'width:100%;height:100%;display:block'
 
+    const terrainMaterial = new THREE.MeshStandardMaterial({
+        color: '#6bc8d8',
+        roughness: 0.82,
+        metalness: 0.05,
+        wireframe: config.wireframe ?? false,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide,
+    })
+
     const terrain = new THREE.Mesh(
         buildTerrainGeometry(options),
-        new THREE.MeshStandardMaterial({ color: '#6bc8d8', roughness: 0.82, metalness: 0.05, wireframe: config.wireframe ?? false }),
+        terrainMaterial,
     )
     terrain.rotation.x = -Math.PI / 2
     scene.add(terrain)
+
+    if (config.heightMap) {
+        applyHeightMap(terrain, config.heightMap, options)
+    }
 
     const grid = new THREE.GridHelper(options.width, 28, '#16879a', '#0d3745')
     grid.position.y = -1.7
@@ -69,6 +157,26 @@ export function createTerrainEngine(container, config = {}) {
     let progress = 0
     let orbit = 0
 
+    function setCameraPreset(name = 'reset') {
+        const presets = {
+            reset: { position: new THREE.Vector3(8, 7, 9), yaw: 0, pitch: -0.35 },
+            front: { position: new THREE.Vector3(0, 4, 12), yaw: Math.PI, pitch: -0.2 },
+            top: { position: new THREE.Vector3(0, 18, 0.1), yaw: 0, pitch: -1.45 },
+            orbit: { position: new THREE.Vector3(12, 9, 12), yaw: 0.8, pitch: -0.5 },
+        }
+
+        const next = presets[name] || presets.reset
+        flyState.position.copy(next.position)
+        flyState.yaw = next.yaw
+        flyState.pitch = next.pitch
+        camera.position.copy(flyState.position)
+        camera.lookAt(new THREE.Vector3(
+            flyState.position.x + Math.sin(flyState.yaw),
+            flyState.position.y + Math.sin(flyState.pitch),
+            flyState.position.z + Math.cos(flyState.yaw),
+        ))
+    }
+
     function resize() {
         const width = Math.max(container.clientWidth, 1)
         const height = Math.max(container.clientHeight, 1)
@@ -77,22 +185,94 @@ export function createTerrainEngine(container, config = {}) {
         renderer.setSize(width, height, false)
     }
 
+    function handleFreeFly(delta) {
+        if (!container || config.mode !== 'flythrough') return
+
+        const forward = new THREE.Vector3(Math.sin(flyState.yaw), 0, Math.cos(flyState.yaw))
+        const right = new THREE.Vector3(Math.cos(flyState.yaw), 0, -Math.sin(flyState.yaw))
+        const up = new THREE.Vector3(0, 1, 0)
+
+        const move = new THREE.Vector3()
+        if (flyState.keys['w'] || flyState.keys['arrowup']) move.add(forward)
+        if (flyState.keys['s'] || flyState.keys['arrowdown']) move.sub(forward)
+        if (flyState.keys['a'] || flyState.keys['arrowleft']) move.sub(right)
+        if (flyState.keys['d'] || flyState.keys['arrowright']) move.add(right)
+        if (flyState.keys['q']) move.sub(up)
+        if (flyState.keys['e']) move.add(up)
+
+        if (move.lengthSq() > 0) {
+            move.normalize().multiplyScalar(flyState.speed * (flyState.keys['shift'] ? 2.6 : 1) * delta * 60)
+            flyState.position.add(move)
+        }
+
+        camera.position.copy(flyState.position)
+        const lookTarget = new THREE.Vector3(
+            flyState.position.x + Math.sin(flyState.yaw) * Math.cos(flyState.pitch),
+            flyState.position.y + Math.sin(flyState.pitch),
+            flyState.position.z + Math.cos(flyState.yaw) * Math.cos(flyState.pitch),
+        )
+        camera.lookAt(lookTarget)
+        drone.position.copy(flyState.position)
+    }
+
     function render() {
         if (destroyed) return
-        if (config.mode === 'flythrough' && autoRotate) {
-            progress = (progress + speed * 0.001) % 1
-            const point = path.getPointAt(progress)
-            camera.position.lerp(point.clone().add(new THREE.Vector3(0, 1.8, 0)), 0.08)
-            camera.lookAt(path.getPointAt((progress + 0.015) % 1))
-            drone.position.copy(point)
-        } else if (config.mode !== 'flythrough' && autoRotate) {
+
+        if (config.mode === 'flythrough') {
+            if (autoRotate) {
+                progress = (progress + speed * 0.001) % 1
+                const point = path.getPointAt(progress)
+                camera.position.lerp(point.clone().add(new THREE.Vector3(0, 1.8, 0)), 0.08)
+                camera.lookAt(path.getPointAt((progress + 0.015) % 1))
+                drone.position.copy(point)
+            } else {
+                handleFreeFly(1)
+            }
+        } else if (autoRotate) {
             orbit += 0.0025
             camera.position.set(Math.cos(orbit) * 10, 7, Math.sin(orbit) * 10)
             camera.lookAt(0, 0, 0)
         }
+
         renderer.render(scene, camera)
         frameId = window.requestAnimationFrame(render)
     }
+
+    const keyHandler = (event) => {
+        const key = event.key.toLowerCase()
+        if (key === 'w' || key === 'a' || key === 's' || key === 'd' || key === 'q' || key === 'e' || key === 'arrowup' || key === 'arrowdown' || key === 'arrowleft' || key === 'arrowright' || key === 'shift') {
+            flyState.keys[key] = event.type === 'keydown'
+            if (event.type === 'keydown') event.preventDefault()
+        }
+    }
+
+    const mouseDown = (event) => {
+        if (config.mode !== 'flythrough') return
+        flyState.drag = true
+        flyState.lastX = event.clientX
+        flyState.lastY = event.clientY
+    }
+
+    const mouseMove = (event) => {
+        if (!flyState.drag || config.mode !== 'flythrough') return
+        const dx = event.clientX - flyState.lastX
+        const dy = event.clientY - flyState.lastY
+        flyState.lastX = event.clientX
+        flyState.lastY = event.clientY
+
+        flyState.yaw -= dx * 0.005
+        flyState.pitch = THREE.MathUtils.clamp(flyState.pitch - dy * 0.004, -1.45, 1.45)
+    }
+
+    const mouseUp = () => {
+        flyState.drag = false
+    }
+
+    container.addEventListener('keydown', keyHandler)
+    container.addEventListener('keyup', keyHandler)
+    container.addEventListener('mousedown', mouseDown)
+    container.addEventListener('mousemove', mouseMove)
+    window.addEventListener('mouseup', mouseUp)
 
     const resizeObserver = new ResizeObserver(resize)
     resizeObserver.observe(container)
@@ -106,11 +286,23 @@ export function createTerrainEngine(container, config = {}) {
             if (typeof next.speed === 'number') speed = Math.max(0, next.speed)
             if (typeof next.wireframe === 'boolean') terrain.material.wireframe = next.wireframe
             if (typeof next.displacementScale === 'number') terrain.scale.y = next.displacementScale
+            if (next.cameraPreset) setCameraPreset(next.cameraPreset)
+            if (next.resetCamera) setCameraPreset('reset')
+            if (next.cameraState) {
+                flyState.position.copy(next.cameraState.position || flyState.position)
+                flyState.yaw = next.cameraState.yaw ?? flyState.yaw
+                flyState.pitch = next.cameraState.pitch ?? flyState.pitch
+            }
         },
         destroy() {
             destroyed = true
             window.cancelAnimationFrame(frameId)
             resizeObserver.disconnect()
+            container.removeEventListener('keydown', keyHandler)
+            container.removeEventListener('keyup', keyHandler)
+            container.removeEventListener('mousedown', mouseDown)
+            container.removeEventListener('mousemove', mouseMove)
+            window.removeEventListener('mouseup', mouseUp)
             terrain.geometry.dispose()
             terrain.material.dispose()
             pathLine.geometry.dispose()
