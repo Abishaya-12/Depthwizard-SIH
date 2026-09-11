@@ -21,7 +21,7 @@ export const DemViewport: React.FC<DemViewportProps> = ({ onNavigate, previewIma
   // Shading settings
   const [solarAzimuth, setSolarAzimuth] = useState(315);
   const [solarZenith, setSolarZenith] = useState(42);
-  const [zExaggeration, setZExaggeration] = useState(1.5);
+  const [zExaggeration, setZExaggeration] = useState(0.7);
   const [cursorAlt, setCursorAlt] = useState(1420);
   const [cursorPinTop, setCursorPinTop] = useState(48);
 

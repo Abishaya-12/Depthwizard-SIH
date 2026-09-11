@@ -1,44 +1,28 @@
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const path = require('path');
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const root = __dirname;
 const frontendDir = path.join(root, 'frontend');
 
-function start(command, args, options = {}) {
-  const child = spawn(command, args, {
-    stdio: 'inherit',
-    shell: true,
-    ...options,
-  });
-
-  child.on('exit', (code, signal) => {
-    if (signal) {
-      console.error(`${command} exited with signal ${signal}`);
-    } else if (code !== 0) {
-      console.error(`${command} exited with code ${code}`);
-    }
-  });
-
-  return child;
-}
-
-console.log('Starting DepthWizard backend and frontend...');
-
-const backend = start('python', ['backend.py'], { cwd: root });
-const frontend = start('D:\\npm.cmd', ['run', 'dev', '--', '--host', '0.0.0.0'], { cwd: frontendDir });
-
-backend.on('exit', () => {
-  frontend.kill();
-  process.exit(1);
+console.log('Building frontend...');
+const build = spawnSync(npmCommand, ['run', 'build'], {
+  cwd: frontendDir,
+  stdio: 'inherit',
+  shell: true,
 });
 
-frontend.on('exit', () => {
-  backend.kill();
-  process.exit(1);
+if (build.status !== 0) {
+  process.exit(build.status ?? 1);
+}
+
+console.log('Starting DepthWizard at http://127.0.0.1:5000');
+const backend = spawn('python', ['backend.py'], {
+  cwd: root,
+  stdio: 'inherit',
 });
 
 process.on('SIGINT', () => {
-  frontend.kill();
   backend.kill();
   process.exit(0);
 });

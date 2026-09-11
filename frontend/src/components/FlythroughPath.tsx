@@ -35,7 +35,13 @@ export const FlythroughPath: React.FC<FlythroughPathProps> = ({ onNavigate, prev
   return (
     <div className="flex flex-col w-full h-[calc(100vh-4rem)] relative overflow-hidden bg-[#080f18] select-none">
       <div className="absolute inset-0">
-        <div ref={terrainRef} className="absolute inset-0" aria-label="Generated Three.js flythrough terrain" />
+        <div
+          ref={terrainRef}
+          tabIndex={0}
+          onPointerDown={(event) => event.currentTarget.focus()}
+          className="absolute inset-0 outline-none"
+          aria-label="Generated Three.js flythrough terrain"
+        />
       </div>
 
       <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3">

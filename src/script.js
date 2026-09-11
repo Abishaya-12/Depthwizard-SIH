@@ -26,21 +26,46 @@ function getHeightFromImage(image, width, height, segments) {
             const r = data[index]
             const g = data[index + 1]
             const b = data[index + 2]
-            const brightness = (r + g + b) / 765
-            values.push(brightness)
+            values.push({
+                brightness: (r + g + b) / 765,
+                red: r / 255,
+                max: Math.max(r, g, b),
+                min: Math.min(r, g, b),
+            })
         }
     }
 
-    const heightValues = new Float32Array(segments * segments)
-    for (let i = 0; i < segments * segments; i += 1) {
-        const x = i % segments
-        const y = Math.floor(i / segments)
-        const sx = Math.min(canvas.width - 1, Math.floor((x / segments) * canvas.width))
-        const sy = Math.min(canvas.height - 1, Math.floor((y / segments) * canvas.height))
-        const sample = values[sy * canvas.width + sx]
-        heightValues[i] = (sample - 0.5) * 2.5
+    const heightValues = new Float32Array((segments + 1) * (segments + 1))
+    for (let y = 0; y <= segments; y += 1) {
+        for (let x = 0; x <= segments; x += 1) {
+            const sx = Math.min(canvas.width - 1, Math.floor((x / segments) * canvas.width))
+            const sy = Math.min(canvas.height - 1, Math.floor((y / segments) * canvas.height))
+            const pixel = values[sy * canvas.width + sx]
+            const saturation = (pixel.max - pixel.min) / Math.max(pixel.max, 1)
+            // Colorized DEMs use red for high elevations; grayscale DEMs use luminance.
+            const sample = saturation > 0.15 ? pixel.red : pixel.brightness
+            heightValues[y * (segments + 1) + x] = sample * 0.9
+        }
     }
-    return heightValues
+
+    const smoothedHeights = new Float32Array(heightValues.length)
+    const side = segments + 1
+    for (let y = 0; y <= segments; y += 1) {
+        for (let x = 0; x <= segments; x += 1) {
+            let total = 0
+            let count = 0
+            for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+                for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+                    const sampleX = Math.max(0, Math.min(segments, x + offsetX))
+                    const sampleY = Math.max(0, Math.min(segments, y + offsetY))
+                    total += heightValues[sampleY * side + sampleX]
+                    count += 1
+                }
+            }
+            smoothedHeights[y * side + x] = total / count
+        }
+    }
+    return smoothedHeights
 }
 
 function buildTerrainGeometry(options) {
@@ -153,7 +178,7 @@ export function createTerrainEngine(container, config = {}) {
     let frameId = 0
     let destroyed = false
     let autoRotate = config.mode !== 'flythrough'
-    let speed = 0.04
+    let speed = 0.12
     let progress = 0
     let orbit = 0
 
@@ -282,10 +307,14 @@ export function createTerrainEngine(container, config = {}) {
     return {
         scene, camera, renderer, terrain, path,
         update(next = {}) {
-            if (typeof next.autoRotate === 'boolean') autoRotate = next.autoRotate
+            if (typeof next.autoRotate === 'boolean') {
+                autoRotate = next.autoRotate
+                pathLine.visible = autoRotate
+                drone.visible = autoRotate
+            }
             if (typeof next.speed === 'number') speed = Math.max(0, next.speed)
             if (typeof next.wireframe === 'boolean') terrain.material.wireframe = next.wireframe
-            if (typeof next.displacementScale === 'number') terrain.scale.y = next.displacementScale
+            if (typeof next.displacementScale === 'number') terrain.scale.z = next.displacementScale
             if (next.cameraPreset) setCameraPreset(next.cameraPreset)
             if (next.resetCamera) setCameraPreset('reset')
             if (next.cameraState) {

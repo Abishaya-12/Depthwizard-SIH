@@ -4,9 +4,10 @@ import os
 import tempfile
 import uuid
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 
+FRONTEND_DIST = Path(__file__).parent / 'frontend' / 'dist'
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1_000 * 1024 * 1024
 
@@ -101,6 +102,15 @@ def process_dem():
 @app.errorhandler(413)
 def request_too_large(_error):
     return jsonify({'error': 'Combined upload exceeds the 1 GB limit.'}), 413
+
+
+@app.route('/', defaults={'frontend_path': ''})
+@app.route('/<path:frontend_path>')
+def frontend(frontend_path):
+    requested_file = FRONTEND_DIST / frontend_path
+    if frontend_path and requested_file.is_file():
+        return send_from_directory(FRONTEND_DIST, frontend_path)
+    return send_from_directory(FRONTEND_DIST, 'index.html')
 
 
 if __name__ == '__main__':
