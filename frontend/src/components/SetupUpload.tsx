@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { processDemFiles } from '../api';
+import { estimateDepthFromImage, processDemFiles } from '../api';
 import { DemProcessingResponse, TabId } from '../types';
 
 interface SetupUploadProps {
@@ -11,7 +11,9 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
   const [fileLayer1, setFileLayer1] = useState<{ name: string; size: string; verified: boolean } | null>(null);
   const [fileLayer2, setFileLayer2] = useState<{ name: string; size: string; verified: boolean } | null>(null);
   const [relativeFile, setRelativeFile] = useState<File | null>(null);
+  const [rgbFile, setRgbFile] = useState<File | null>(null);
   const [absoluteFile, setAbsoluteFile] = useState<File | null>(null);
+  const [relativeInputMode, setRelativeInputMode] = useState<'dem' | 'rgb'>('dem');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const [datumModel, setDatumModel] = useState('Lunar Sphere R=1737.4 km');
@@ -20,6 +22,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
   const [error, setError] = useState<string | null>(null);
 
   const fileInput1Ref = useRef<HTMLInputElement | null>(null);
+  const rgbInputRef = useRef<HTMLInputElement | null>(null);
   const fileInput2Ref = useRef<HTMLInputElement | null>(null);
 
   const handleFile1Upload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,19 +51,46 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
     }
   };
 
+  const handleRgbUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setRgbFile(file);
+      setFileLayer1({
+        name: file.name,
+        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB • RGB PHOTO • READY FOR AI DEPTH`,
+        verified: true,
+      });
+    }
+  };
+
+  const dataUrlToFile = async (dataUrl: string, filename: string) => {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    return new File([blob], filename, { type: 'image/png' });
+  };
+
   const handleSynthesize = async () => {
-    if (!relativeFile && !absoluteFile) {
-      setError('Select at least one DEM file before starting synthesis.');
+    if (!relativeFile && !rgbFile && !absoluteFile) {
+      setError('Select a relative DEM, raw RGB photo, or absolute DEM before starting synthesis.');
       return;
     }
 
     setIsSynthesizing(true);
     setError(null);
     try {
-      const result = await processDemFiles(relativeFile, absoluteFile);
+      let processedRelativeFile = relativeFile;
+      let generatedPreviewImage = previewImage;
+      if (relativeInputMode === 'rgb' && rgbFile) {
+        const depthResult = await estimateDepthFromImage(rgbFile);
+        generatedPreviewImage = depthResult.relativeDemUrl;
+        setPreviewImage(generatedPreviewImage);
+        processedRelativeFile = await dataUrlToFile(depthResult.relativeDemUrl, `${rgbFile.name}-relative-dem.png`);
+      }
+
+      const result = await processDemFiles(processedRelativeFile, absoluteFile);
       onProcessed({
         ...result,
-        previewImage: previewImage ?? result.previewImage ?? null,
+        previewImage: generatedPreviewImage ?? result.previewImage ?? null,
       });
       onNavigate('map-generated');
     } catch (requestError) {
@@ -83,6 +113,13 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
         onChange={handleFile1Upload} 
         className="hidden" 
         accept=".png"
+      />
+      <input
+        type="file"
+        ref={rgbInputRef}
+        onChange={handleRgbUpload}
+        className="hidden"
+        accept=".jpg,.jpeg,.png"
       />
       <input 
         type="file" 
@@ -335,11 +372,30 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
 
             <div>
               <h3 className="font-headline-md text-[24px] text-[#dce3f0] tracking-tight">
-                Upload Relative DEM PNG
+                {relativeInputMode === 'dem' ? 'Upload Relative DEM PNG' : 'Upload Raw RGB Photo'}
               </h3>
               <p className="font-body-md text-[14px] text-[#bac9cc] mt-1">
-                Use a grayscale or height-map PNG as the relative DEM input for the terrain displacement surface.
+                {relativeInputMode === 'dem'
+                  ? 'Use a grayscale or height-map PNG as the relative DEM input for the terrain displacement surface.'
+                  : 'Generate a relative DEM automatically from one RGB image using Depth Anything V2.'}
               </p>
+            </div>
+
+            <div className="flex items-center gap-2 bg-[#080f18]/80 p-1 rounded-lg border border-[#3b494c]/30">
+              <button
+                type="button"
+                onClick={() => { setRelativeInputMode('dem'); setRgbFile(null); setFileLayer1(null); }}
+                className={`flex-1 px-3 py-2 rounded font-mono-coordinate text-[11px] uppercase cursor-pointer ${relativeInputMode === 'dem' ? 'bg-[#00e5ff] text-[#00363d] font-bold' : 'text-[#bac9cc] hover:text-[#dce3f0]'}`}
+              >
+                Pre-made DEM
+              </button>
+              <button
+                type="button"
+                onClick={() => { setRelativeInputMode('rgb'); setRelativeFile(null); setFileLayer1(null); }}
+                className={`flex-1 px-3 py-2 rounded font-mono-coordinate text-[11px] uppercase cursor-pointer ${relativeInputMode === 'rgb' ? 'bg-[#00e5ff] text-[#00363d] font-bold' : 'text-[#bac9cc] hover:text-[#dce3f0]'}`}
+              >
+                Raw RGB + AI Depth
+              </button>
             </div>
 
             {/* Format tags */}
@@ -351,7 +407,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
 
             {/* Dropzone */}
             <div 
-              onClick={() => fileInput1Ref.current?.click()}
+              onClick={() => (relativeInputMode === 'dem' ? fileInput1Ref.current?.click() : rgbInputRef.current?.click())}
               className="mt-2 bg-[#080f18]/90 rounded-lg p-5 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer border border-[#3b494c]/30 hover:border-[#00e5ff]/50 hover:bg-[#080f18]"
             >
               <div className="w-12 h-12 rounded-full bg-[#242a34] flex items-center justify-center text-[#c3f5ff] shadow-[0_0_12px_rgba(0,229,255,0.2)]">
@@ -359,10 +415,10 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
               </div>
               <div className="flex flex-col items-center text-center">
                 <span className="font-mono-telemetry text-[13px] text-[#dce3f0] font-semibold">
-                  Drag &amp; drop relative stereo raster
+                  {relativeInputMode === 'dem' ? 'Drag & drop relative DEM raster' : 'Upload raw RGB photo for depth estimation'}
                 </span>
                 <span className="font-body-sm text-[12px] text-[#849396] mt-0.5">
-                  or click to open high-speed satellite file buffer
+                  {relativeInputMode === 'dem' ? 'or click to open height-map PNG' : 'JPG, JPEG, or PNG accepted'}
                 </span>
               </div>
             </div>
@@ -384,7 +440,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
                   </div>
                 </div>
                 <button 
-                  onClick={() => { setFileLayer1(null); setRelativeFile(null); }}
+                  onClick={() => { setFileLayer1(null); setRelativeFile(null); setRgbFile(null); }}
                   className="text-[#bac9cc] hover:text-[#ffb4ab] transition-colors p-1 cursor-pointer"
                   title="Remove file"
                 >

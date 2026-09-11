@@ -120,19 +120,25 @@ export const MeshProcessing: React.FC<MeshProcessingProps> = ({ onNavigate, proc
 
         {/* Generated Topographic Elevation Heatmap Asset */}
         <div className="relative w-full h-[520px] md:h-[620px] overflow-hidden flex items-center justify-center">
-          <div 
-            className={`absolute inset-0 bg-cover bg-center transition-all duration-700 ease-out filter brightness-105 contrast-110 ${
-              isZoomed ? 'scale-125' : 'scale-100 group-hover:scale-105'
-            }`}
-            style={{ 
-              backgroundImage: previewImage
-                ? `url("${previewImage}")`
-                : `linear-gradient(45deg, rgba(255,255,255,0.14) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.14) 75%), linear-gradient(45deg, rgba(255,255,255,0.14) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.14) 75%), radial-gradient(circle at center, rgba(0,229,255,0.28), rgba(0,0,0,0.6) 42%, rgba(0,0,0,0.92))`,
-              backgroundSize: previewImage ? 'cover' : '28px 28px, 28px 28px, cover',
-              backgroundPosition: previewImage ? 'center' : '0 0, 14px 14px, center',
-              transformOrigin: isZoomed ? `${zoomOrigin.x}% ${zoomOrigin.y}%` : 'center center'
-            }}
-          />
+          {previewImage ? (
+            <img
+              src={previewImage}
+              alt="Generated relative DEM preview"
+              className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-out filter brightness-105 contrast-110 ${
+                isZoomed ? 'scale-125' : 'scale-100 group-hover:scale-105'
+              }`}
+              style={{ transformOrigin: isZoomed ? `${zoomOrigin.x}% ${zoomOrigin.y}%` : 'center center' }}
+            />
+          ) : (
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.14) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.14) 75%), linear-gradient(45deg, rgba(255,255,255,0.14) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.14) 75%), radial-gradient(circle at center, rgba(0,229,255,0.28), rgba(0,0,0,0.6) 42%, rgba(0,0,0,0.92))',
+                backgroundSize: '28px 28px, 28px 28px, cover',
+                backgroundPosition: '0 0, 14px 14px, center',
+              }}
+            />
+          )}
 
           {/* Laser Scan Grid Overlay (SVG) */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-30 group-hover:opacity-50 transition-opacity" xmlns="http://www.w3.org/2000/svg">

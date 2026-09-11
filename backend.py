@@ -1,18 +1,36 @@
 from pathlib import Path
+import base64
 import hashlib
+import io
+import logging
 import os
 import tempfile
 import uuid
+
+import numpy as np
 
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 
 FRONTEND_DIST = Path(__file__).parent / 'frontend' / 'dist'
+DEPTH_OUTPUT_DIR = Path(__file__).parent / 'static' / 'generated-depth'
+DEPTH_MODEL = 'depth-anything/Depth-Anything-V2-Small-hf'
+depth_estimator = None
+logging.basicConfig(level=logging.INFO)
+
+try:
+    from transformers import pipeline
+    depth_estimator = pipeline('depth-estimation', model=DEPTH_MODEL)
+    logging.getLogger(__name__).info('Depth estimation model loaded successfully: %s', DEPTH_MODEL)
+except Exception as error:
+    logging.getLogger(__name__).exception('Depth estimation model failed to load: %s', error)
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1_000 * 1024 * 1024
 
 ALLOWED_RELATIVE = {'.png'}
 ALLOWED_ABSOLUTE = {'.dem', '.tif', '.tiff', '.las', '.laz', '.png'}
+ALLOWED_RGB = {'.jpg', '.jpeg', '.png'}
 
 
 def file_metadata(upload, allowed_extensions):
@@ -58,6 +76,63 @@ def file_metadata(upload, allowed_extensions):
         return metadata
     finally:
         temporary_path.unlink(missing_ok=True)
+
+
+def save_upload_for_inference(upload):
+    filename = secure_filename(upload.filename or '')
+    extension = Path(filename).suffix.lower()
+    if not filename or extension not in ALLOWED_RGB:
+        raise ValueError(f'Unsupported RGB image type: {extension or "missing extension"}')
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temporary_file:
+        upload.save(temporary_file)
+        return Path(temporary_file.name)
+
+
+@app.post('/api/estimate-depth')
+def estimate_depth():
+    rgb_upload = request.files.get('rgb_image')
+    if rgb_upload is None:
+        return jsonify({'error': 'Provide an RGB image in the rgb_image field.'}), 400
+    if depth_estimator is None:
+        return jsonify({'error': 'Depth estimation model is unavailable on the server.'}), 500
+
+    temporary_path = None
+    try:
+        temporary_path = save_upload_for_inference(rgb_upload)
+        from PIL import Image
+
+        with Image.open(temporary_path) as image:
+            depth_result = depth_estimator(image.convert('RGB'))
+
+        depth_image = depth_result.get('depth') if isinstance(depth_result, dict) else depth_result
+        if depth_image is None:
+            raise RuntimeError('The depth model returned no depth map.')
+
+        depth_values = np.asarray(depth_image, dtype=np.float32)
+        minimum = float(depth_values.min())
+        maximum = float(depth_values.max())
+        if maximum > minimum:
+            depth_values = (depth_values - minimum) / (maximum - minimum)
+        else:
+            depth_values.fill(0)
+        depth_image = Image.fromarray(np.round(depth_values * 255).astype(np.uint8), mode='L')
+        depth_output = DEPTH_OUTPUT_DIR / f'{uuid.uuid4().hex}.png'
+        DEPTH_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        depth_image.save(depth_output, format='PNG')
+
+        buffer = io.BytesIO()
+        depth_image.save(buffer, format='PNG')
+        data_url = 'data:image/png;base64,' + base64.b64encode(buffer.getvalue()).decode('ascii')
+        return jsonify({'relativeDemUrl': data_url, 'jobId': uuid.uuid4().hex})
+    except ValueError as error:
+        return jsonify({'error': str(error)}), 400
+    except Exception as error:
+        logging.getLogger(__name__).exception('Depth estimation failed: %s', error)
+        return jsonify({'error': 'Depth estimation failed. Check the image and server model logs.'}), 500
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
 @app.get('/api/health')

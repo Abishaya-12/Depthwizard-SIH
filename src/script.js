@@ -84,7 +84,7 @@ function buildTerrainGeometry(options) {
     return geometry
 }
 
-function applyHeightMap(terrain, imageSrc, options) {
+function applyHeightMap(terrain, imageSrc, options, onApplied) {
     if (!imageSrc) return
 
     const image = new Image()
@@ -96,6 +96,7 @@ function applyHeightMap(terrain, imageSrc, options) {
         terrain.geometry = buildTerrainGeometry({ ...options, heightValues })
         terrain.geometry.computeVertexNormals()
         terrain.geometry.needsUpdate = true
+        onApplied?.()
     }
     image.src = imageSrc
 }
@@ -119,7 +120,7 @@ export function createTerrainEngine(container, config = {}) {
         drag: false,
         lastX: 0,
         lastY: 0,
-        speed: 0.24,
+        speed: 0.06,
         boost: 1,
         keys: {},
     }
@@ -150,10 +151,6 @@ export function createTerrainEngine(container, config = {}) {
     terrain.rotation.x = -Math.PI / 2
     scene.add(terrain)
 
-    if (config.heightMap) {
-        applyHeightMap(terrain, config.heightMap, options)
-    }
-
     const grid = new THREE.GridHelper(options.width, 28, '#16879a', '#0d3745')
     grid.position.y = -1.7
     scene.add(grid)
@@ -172,6 +169,28 @@ export function createTerrainEngine(container, config = {}) {
     )
     pathLine.position.y = 0.15
     scene.add(pathLine)
+
+    function refreshPathHeight() {
+        terrain.updateMatrixWorld(true)
+        const raycaster = new THREE.Raycaster()
+        const rayOrigin = new THREE.Vector3()
+        const rayDirection = new THREE.Vector3(0, -1, 0)
+        const clearance = 1.5
+
+        for (const point of path.points) {
+            rayOrigin.set(point.x, 100, point.z)
+            raycaster.set(rayOrigin, rayDirection)
+            const hit = raycaster.intersectObject(terrain, false)[0]
+            if (hit) point.y = hit.point.y + clearance
+        }
+
+        pathLine.geometry.dispose()
+        pathLine.geometry = new THREE.BufferGeometry().setFromPoints(path.getPoints(80))
+    }
+
+    if (config.heightMap) {
+        applyHeightMap(terrain, config.heightMap, options, refreshPathHeight)
+    }
 
     const drone = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }))
     scene.add(drone)
@@ -285,8 +304,8 @@ export function createTerrainEngine(container, config = {}) {
         flyState.lastX = event.clientX
         flyState.lastY = event.clientY
 
-        flyState.yaw -= dx * 0.005
-        flyState.pitch = THREE.MathUtils.clamp(flyState.pitch - dy * 0.004, -1.45, 1.45)
+        flyState.yaw -= dx * 0.0015
+        flyState.pitch = THREE.MathUtils.clamp(flyState.pitch - dy * 0.0012, -1.45, 1.45)
     }
 
     const mouseUp = () => {
