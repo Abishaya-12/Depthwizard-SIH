@@ -5,9 +5,10 @@ import { createTerrainEngine } from '../../../src/script.js';
 interface FlythroughPathProps {
   onNavigate: (tab: TabId) => void;
   previewImage?: string | null;
+  zExaggeration: number;
 }
 
-export const FlythroughPath: React.FC<FlythroughPathProps> = ({ onNavigate, previewImage }) => {
+export const FlythroughPath: React.FC<FlythroughPathProps> = ({ onNavigate, previewImage, zExaggeration }) => {
   const terrainRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<ReturnType<typeof createTerrainEngine> | null>(null);
   const [cameraPreset, setCameraPreset] = useState<'front' | 'top' | 'orbit' | 'reset'>('front');
@@ -19,8 +20,13 @@ export const FlythroughPath: React.FC<FlythroughPathProps> = ({ onNavigate, prev
       mode: 'flythrough',
       heightMap: previewImage ?? undefined,
     });
+    engineRef.current.update({
+      displacementScale: zExaggeration,
+      autoRotate: autopilot,
+      cameraPreset,
+    });
     return () => engineRef.current?.destroy();
-  }, [previewImage]);
+  }, [previewImage, zExaggeration]);
 
   useEffect(() => {
     if (!engineRef.current) return;

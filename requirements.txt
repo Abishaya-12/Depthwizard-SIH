@@ -3,6 +3,7 @@ matplotlib
 numpy
 Pillow
 rasterio
+scipy
 scikit-learn
 torch
 transformers

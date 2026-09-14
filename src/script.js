@@ -115,12 +115,15 @@ export function createTerrainEngine(container, config = {}) {
 
     const flyState = {
         position: defaultCamera.position.clone(),
+        velocity: new THREE.Vector3(),
         yaw: defaultCamera.yaw,
         pitch: defaultCamera.pitch,
+        yawTarget: defaultCamera.yaw,
+        pitchTarget: defaultCamera.pitch,
         drag: false,
         lastX: 0,
         lastY: 0,
-        speed: 0.06,
+        speed: 5.5,
         boost: 1,
         keys: {},
     }
@@ -157,6 +160,10 @@ export function createTerrainEngine(container, config = {}) {
     const sun = new THREE.DirectionalLight('#c3f5ff', 3.2)
     sun.position.set(4, 8, 5)
     scene.add(sun, new THREE.AmbientLight('#1a5260', 1.8))
+    const followLight = config.mode === 'flythrough'
+        ? new THREE.PointLight('#c3f5ff', 2.4, 8)
+        : null
+    if (followLight) scene.add(followLight)
 
     const path = new THREE.CatmullRomCurve3([
         new THREE.Vector3(-5, 2.5, 5), new THREE.Vector3(-2, 2, 2),
@@ -196,6 +203,7 @@ export function createTerrainEngine(container, config = {}) {
     scene.add(drone)
     let frameId = 0
     let destroyed = false
+    let lastFrameTime = performance.now()
     let autoRotate = config.mode !== 'flythrough'
     let speed = 0.12
     let progress = 0
@@ -213,6 +221,9 @@ export function createTerrainEngine(container, config = {}) {
         flyState.position.copy(next.position)
         flyState.yaw = next.yaw
         flyState.pitch = next.pitch
+        flyState.yawTarget = next.yaw
+        flyState.pitchTarget = next.pitch
+        flyState.velocity.set(0, 0, 0)
         camera.position.copy(flyState.position)
         camera.lookAt(new THREE.Vector3(
             flyState.position.x + Math.sin(flyState.yaw),
@@ -232,6 +243,14 @@ export function createTerrainEngine(container, config = {}) {
     function handleFreeFly(delta) {
         if (!container || config.mode !== 'flythrough') return
 
+        const lookSmoothing = 1 - Math.pow(0.001, delta)
+        const yawDelta = Math.atan2(
+            Math.sin(flyState.yawTarget - flyState.yaw),
+            Math.cos(flyState.yawTarget - flyState.yaw),
+        )
+        flyState.yaw += yawDelta * lookSmoothing
+        flyState.pitch += (flyState.pitchTarget - flyState.pitch) * lookSmoothing
+
         const forward = new THREE.Vector3(Math.sin(flyState.yaw), 0, Math.cos(flyState.yaw))
         const right = new THREE.Vector3(Math.cos(flyState.yaw), 0, -Math.sin(flyState.yaw))
         const up = new THREE.Vector3(0, 1, 0)
@@ -244,9 +263,20 @@ export function createTerrainEngine(container, config = {}) {
         if (flyState.keys['q']) move.sub(up)
         if (flyState.keys['e']) move.add(up)
 
-        if (move.lengthSq() > 0) {
-            move.normalize().multiplyScalar(flyState.speed * (flyState.keys['shift'] ? 2.6 : 1) * delta * 60)
-            flyState.position.add(move)
+        const isMoving = move.lengthSq() > 0
+        const isBoosting = isMoving && Boolean(flyState.keys['shift'])
+        const targetVelocity = isMoving
+            ? move.normalize().multiplyScalar(flyState.speed * (isBoosting ? 2.6 : 1))
+            : new THREE.Vector3()
+        const movementSmoothing = 1 - Math.pow(0.001, delta)
+        flyState.velocity.lerp(targetVelocity, movementSmoothing)
+        flyState.position.addScaledVector(flyState.velocity, delta)
+
+        const targetFov = isBoosting ? 59 : 48
+        const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.pow(0.01, delta))
+        if (Math.abs(nextFov - camera.fov) > 0.001) {
+            camera.fov = nextFov
+            camera.updateProjectionMatrix()
         }
 
         camera.position.copy(flyState.position)
@@ -257,10 +287,17 @@ export function createTerrainEngine(container, config = {}) {
         )
         camera.lookAt(lookTarget)
         drone.position.copy(flyState.position)
+        if (followLight) {
+            const lookDirection = lookTarget.sub(camera.position).normalize()
+            followLight.position.copy(camera.position).addScaledVector(lookDirection, 0.8)
+        }
     }
 
     function render() {
         if (destroyed) return
+        const now = performance.now()
+        const delta = Math.min((now - lastFrameTime) / 1000, 0.1)
+        lastFrameTime = now
 
         if (config.mode === 'flythrough') {
             if (autoRotate) {
@@ -270,7 +307,7 @@ export function createTerrainEngine(container, config = {}) {
                 camera.lookAt(path.getPointAt((progress + 0.015) % 1))
                 drone.position.copy(point)
             } else {
-                handleFreeFly(1)
+                handleFreeFly(delta)
             }
         } else if (autoRotate) {
             orbit += 0.0025
@@ -304,8 +341,8 @@ export function createTerrainEngine(container, config = {}) {
         flyState.lastX = event.clientX
         flyState.lastY = event.clientY
 
-        flyState.yaw -= dx * 0.0015
-        flyState.pitch = THREE.MathUtils.clamp(flyState.pitch - dy * 0.0012, -1.45, 1.45)
+        flyState.yawTarget -= dx * 0.0015
+        flyState.pitchTarget = THREE.MathUtils.clamp(flyState.pitchTarget - dy * 0.0012, -1.45, 1.45)
     }
 
     const mouseUp = () => {
@@ -340,6 +377,9 @@ export function createTerrainEngine(container, config = {}) {
                 flyState.position.copy(next.cameraState.position || flyState.position)
                 flyState.yaw = next.cameraState.yaw ?? flyState.yaw
                 flyState.pitch = next.cameraState.pitch ?? flyState.pitch
+                flyState.yawTarget = flyState.yaw
+                flyState.pitchTarget = flyState.pitch
+                flyState.velocity.set(0, 0, 0)
             }
         },
         destroy() {
@@ -355,6 +395,10 @@ export function createTerrainEngine(container, config = {}) {
             terrain.material.dispose()
             pathLine.geometry.dispose()
             pathLine.material.dispose()
+            if (followLight) {
+                scene.remove(followLight)
+                followLight.shadow.map?.dispose()
+            }
             renderer.dispose()
             container.replaceChildren()
         },

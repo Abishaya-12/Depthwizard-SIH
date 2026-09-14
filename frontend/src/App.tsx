@@ -13,6 +13,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [processingResult, setProcessingResult] = useState<DemProcessingResponse | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [zExaggeration, setZExaggeration] = useState(0.7);
 
   return (
     <div className="min-h-screen bg-[#0d141d] text-[#dce3f0] selection:bg-[#00e5ff] selection:text-[#00363d] flex flex-col font-body-md antialiased overflow-x-hidden">
@@ -73,11 +74,20 @@ export default function App() {
           )}
 
           {activeTab === '3d-dem-viewer' && (
-            <DemViewport onNavigate={setActiveTab} previewImage={previewImage} />
+            <DemViewport
+              onNavigate={setActiveTab}
+              previewImage={previewImage}
+              zExaggeration={zExaggeration}
+              setZExaggeration={setZExaggeration}
+            />
           )}
 
           {activeTab === '3d-flythrough' && (
-            <FlythroughPath onNavigate={setActiveTab} previewImage={previewImage} />
+            <FlythroughPath
+              onNavigate={setActiveTab}
+              previewImage={previewImage}
+              zExaggeration={zExaggeration}
+            />
           )}
         </main>
       </div>

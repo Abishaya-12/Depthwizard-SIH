@@ -8,6 +8,7 @@ import tempfile
 import uuid
 
 import numpy as np
+from scipy.ndimage import gaussian_filter
 
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
@@ -110,9 +111,11 @@ def estimate_depth():
             raise RuntimeError('The depth model returned no depth map.')
 
         depth_values = np.asarray(depth_image, dtype=np.float32)
-        minimum = float(depth_values.min())
-        maximum = float(depth_values.max())
+        sigma = max(image.width, image.height) / 150
+        depth_values = gaussian_filter(depth_values, sigma=sigma)
+        minimum, maximum = np.percentile(depth_values, [2, 98])
         if maximum > minimum:
+            depth_values = np.clip(depth_values, minimum, maximum)
             depth_values = (depth_values - minimum) / (maximum - minimum)
         else:
             depth_values.fill(0)

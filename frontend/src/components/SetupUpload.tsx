@@ -234,119 +234,38 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
         </div>
       </section>
 
-      {/* CENTERPIECE: Real-time Auto-Rotating Topological Wireframe Viewport */}
-      <section className="relative w-full h-80 sm:h-96 rounded-xl bg-[#080f18] overflow-hidden shadow-2xl flex items-center justify-center border border-[#3b494c]/20">
-        {/* Deep Grid Background Texture */}
-        <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#00e5ff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none"></div>
-
-        {/* Corner Reticle Hud Markers */}
-        <div className="absolute top-4 left-4 flex flex-col gap-1 z-10">
-          <div className="flex items-center gap-2">
-            <span className="font-label-caps text-[10px] text-[#4cd6fb] uppercase tracking-widest">
-              ISRO-SPATIAL // STEREO SCAN ENGINE
-            </span>
-            <span className="px-2 py-0.5 rounded bg-[#c3f5ff]/10 text-[#c3f5ff] font-mono-coordinate text-[11px]">
-              ROT: 0.5°/TICK
-            </span>
-          </div>
-          <div className="font-mono-coordinate text-[11px] text-[#849396]">
-            SENSOR: TMC-2 HYPERSPECTRAL // RES: 0.25m/px GSD
-          </div>
-        </div>
-
-        <div className="absolute top-4 right-4 flex flex-col items-end gap-1 text-right z-10">
-          <span className="font-label-caps text-[10px] text-[#bac9cc] uppercase">
-            TARGET TERRAIN COORD
-          </span>
-          <span className="font-mono-coordinate text-[11px] text-[#c3f5ff]">
-            LAT 89.9°S • LON 0.0°E (SHACKLETON CRATER RIM)
-          </span>
-        </div>
-
-        {/* Real-time Rotating 3D Terrain Wireframe */}
-        <div className="relative w-72 h-72 sm:w-96 sm:h-96 flex items-center justify-center [perspective:1000px]">
-          <div 
-            className="absolute inset-0 flex items-center justify-center animate-[spin_28s_linear_infinite]" 
-            style={{ transformStyle: 'preserve-3d' }}
-          >
-            <svg 
-              className="w-full h-full text-[#4cd6fb] opacity-70 drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="1.2" 
-              viewBox="0 0 400 400"
-            >
-              <ellipse cx="200" cy="200" rx="190" ry="110" strokeDasharray="4 2" strokeOpacity="0.2"></ellipse>
-              <ellipse cx="200" cy="195" rx="170" ry="98" strokeOpacity="0.3"></ellipse>
-              <path d="M 40 200 C 90 140, 150 170, 200 130 C 260 90, 320 160, 360 200 C 310 240, 260 210, 200 250 C 140 290, 80 230, 40 200 Z" strokeOpacity="0.45"></path>
-              <path d="M 65 198 C 110 145, 160 165, 200 142 C 245 110, 295 162, 335 198 C 290 235, 245 210, 200 238 C 150 268, 105 220, 65 198 Z" strokeOpacity="0.6"></path>
-              <path d="M 95 196 C 130 152, 170 168, 200 155 C 230 135, 270 168, 305 196 C 270 225, 230 208, 200 225 C 165 248, 125 215, 95 196 Z" strokeOpacity="0.8"></path>
-              <path className="text-[#00e5ff]" d="M 130 195 C 155 165, 180 174, 200 168 C 220 155, 245 174, 270 195 C 245 215, 220 205, 200 215 C 175 230, 150 210, 130 195 Z" strokeWidth="1.8"></path>
-              
-              <line strokeDasharray="2 4" strokeOpacity="0.3" x1="200" x2="200" y1="20" y2="380"></line>
-              <line strokeDasharray="2 4" strokeOpacity="0.3" x1="20" x2="380" y1="200" y2="200"></line>
-              <line strokeDasharray="1 3" strokeOpacity="0.2" x1="72" x2="328" y1="72" y2="328"></line>
-              <line strokeDasharray="1 3" strokeOpacity="0.2" x1="72" x2="328" y1="328" y2="72"></line>
-
-              <circle className="shadow-[0_0_8px_#00e5ff]" cx="200" cy="180" fill="#00e5ff" r="4"></circle>
-              <circle cx="165" cy="165" fill="#4cd6fb" r="3"></circle>
-              <circle cx="235" cy="195" fill="#4cd6fb" r="3"></circle>
-            </svg>
-          </div>
-
-          {/* Center Crosshair & Pitch Readout Overlay */}
-          <div className="absolute pointer-events-none flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-[#00e5ff]/5 flex items-center justify-center shadow-[0_0_24px_rgba(0,229,255,0.2)]">
-              <span className="material-symbols-outlined text-[#c3f5ff] text-[28px] animate-pulse">
-                filter_center_focus
+      {/* ISRO BHUVAN MAP NAVIGATION */}
+      <section className="relative w-full overflow-hidden rounded-xl bg-[#080f18] p-6 sm:p-8 shadow-2xl border border-[#3b494c]/20">
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#00e5ff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none"></div>
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="material-symbols-outlined text-[#00e5ff] text-[22px]">public</span>
+              <span className="font-label-caps text-[10px] text-[#4cd6fb] uppercase tracking-widest">
+                ISRO GEOSPATIAL ACCESS
               </span>
             </div>
-            <span className="font-mono-coordinate text-[11px] text-[#c3f5ff] bg-[#080f18]/90 px-2 py-1 rounded mt-2 tracking-widest uppercase border border-[#3b494c]/30">
-              TARGET LOCK // Z: +1,842.6M
-            </span>
+            <h2 className="font-headline-md text-[24px] sm:text-[28px] text-[#c3f5ff] font-semibold">
+              Navigate in Bhuvan
+            </h2>
+            <p className="font-body-md text-[14px] text-[#bac9cc] mt-2 leading-relaxed">
+              Open ISRO&apos;s official Bhuvan portal to explore satellite imagery, terrain layers, and geospatial data before selecting your DEM files.
+            </p>
           </div>
+          <a
+            href="https://bhuvan.nrsc.gov.in/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 shrink-0 bg-[#00e5ff] text-[#00363d] px-6 py-3 rounded-full font-mono-telemetry text-[13px] font-bold tracking-wider uppercase transition-all shadow-[0_0_20px_rgba(0,229,255,0.35)] hover:bg-[#c3f5ff] hover:shadow-[0_0_30px_rgba(0,229,255,0.65)]"
+          >
+            <span>Open Bhuvan Map</span>
+            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+          </a>
         </div>
-
-        {/* Vertical Elevation Scale */}
-        <div className="absolute right-4 bottom-4 top-16 hidden md:flex flex-col items-end justify-between py-2">
-          <div className="flex items-center gap-2">
-            <span className="font-mono-coordinate text-[11px] text-[#c3f5ff] font-bold">+2850m MAX</span>
-            <span className="w-3 h-0.5 bg-[#c3f5ff]"></span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono-coordinate text-[11px] text-[#bac9cc]">+1500m</span>
-            <span className="w-2 h-0.5 bg-[#849396]"></span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono-coordinate text-[11px] text-[#bac9cc]">0m DATUM</span>
-            <span className="w-2 h-0.5 bg-[#00b2d6]"></span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono-coordinate text-[11px] text-[#849396]">-1200m MIN</span>
-            <span className="w-3 h-0.5 bg-[#3b494c]"></span>
-          </div>
-        </div>
-
-        {/* Viewport Bottom Control Bar */}
-        <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between pointer-events-auto">
-          <div className="flex items-center gap-2 bg-[#242a34]/80 backdrop-blur px-3 py-1 rounded border border-[#3b494c]/30">
-            <button className="text-[#bac9cc] hover:text-[#c3f5ff] transition-colors flex items-center cursor-pointer">
-              <span className="material-symbols-outlined text-[18px]">view_in_ar</span>
-            </button>
-            <span className="font-mono-coordinate text-[11px] text-[#849396]">|</span>
-            <button className="text-[#bac9cc] hover:text-[#c3f5ff] transition-colors flex items-center cursor-pointer">
-              <span className="material-symbols-outlined text-[18px]">rotate_right</span>
-            </button>
-            <span className="font-mono-coordinate text-[11px] text-[#849396]">|</span>
-            <span className="font-mono-coordinate text-[11px] text-[#dce3f0]">GRIDDEC: 512x512 QUAD</span>
-          </div>
-
-          <div className="flex items-center gap-2 bg-[#242a34]/80 backdrop-blur px-3 py-1 rounded border border-[#3b494c]/30">
-            <span className="w-2 h-2 rounded-full bg-[#00e5ff]"></span>
-            <span className="font-label-caps text-[10px] text-[#dce3f0] uppercase">
-              RENDER ENGINE ACTIVE // THREE.JS WEBGL2
-            </span>
-          </div>
+        <div className="relative z-10 mt-6 pt-4 border-t border-[#3b494c]/30 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono-coordinate text-[11px] text-[#849396]">
+          <span>PROVIDER: ISRO / NRSC</span>
+          <span>MODE: EXTERNAL MAP NAVIGATION</span>
+          <span className="text-[#4cd6fb]">SOURCE: BHUVAN.NRSC.GOV.IN</span>
         </div>
       </section>
 
