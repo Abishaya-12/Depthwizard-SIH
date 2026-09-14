@@ -266,11 +266,11 @@ export const MeshProcessing: React.FC<MeshProcessingProps> = ({ onNavigate, proc
           </div>
           <div className="flex flex-col p-2 bg-[#080f18]/70 rounded border border-[#3b494c]/20">
             <span className="font-label-caps text-[10px] text-[#849396] uppercase">Survey BBOX</span>
-            <span className="font-mono-telemetry text-[13px] text-[#4cd6fb] font-semibold truncate">{processingResult ? `${processingResult.result.surveyAreaKm2} km²` : '--'}</span>
+            <span className="font-mono-telemetry text-[13px] text-[#4cd6fb] font-semibold truncate">{processingResult?.result.surveyAreaKm2 !== undefined ? `${processingResult.result.surveyAreaKm2.toFixed(2)} km²` : '--'}</span>
           </div>
           <div className="flex flex-col p-2 bg-[#080f18]/70 rounded border border-[#3b494c]/20">
             <span className="font-label-caps text-[10px] text-[#849396] uppercase">Max Relief Delta</span>
-            <span className="font-mono-telemetry text-[13px] text-[#e1eeff] font-semibold truncate">{processingResult ? `Δ ${processingResult.result.maxReliefMeters.toLocaleString()} m` : '--'}</span>
+            <span className="font-mono-telemetry text-[13px] text-[#e1eeff] font-semibold truncate">{processingResult?.result.maxReliefMeters !== undefined ? `Δ ${processingResult.result.maxReliefMeters.toLocaleString()} m` : '--'}</span>
           </div>
         </div>
 

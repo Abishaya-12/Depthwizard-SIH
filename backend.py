@@ -11,6 +11,7 @@ import uuid
 import cv2
 import numpy as np
 import requests
+from scipy.ndimage import zoom
 
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
@@ -90,6 +91,72 @@ def save_upload_for_inference(upload):
     with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temporary_file:
         upload.save(temporary_file)
         return Path(temporary_file.name)
+
+
+def save_upload_for_processing(upload, allowed_extensions):
+    filename = secure_filename(upload.filename or '')
+    extension = Path(filename).suffix.lower()
+    if not filename or extension not in allowed_extensions:
+        raise ValueError(f'Unsupported file type: {extension or "missing extension"}')
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temporary_file:
+        upload.save(temporary_file)
+        return Path(temporary_file.name)
+
+
+def load_relative_dem(path):
+    from PIL import Image
+
+    with Image.open(path) as image:
+        image = image.convert('L')
+        values = np.asarray(image, dtype=np.float32) / 255.0
+    if values.ndim != 2 or values.size == 0:
+        raise ValueError('Relative DEM must contain a readable 2D grayscale image.')
+    return values
+
+
+def load_absolute_dem(path):
+    import rasterio
+
+    with rasterio.open(path) as dataset:
+        if dataset.count < 1:
+            raise ValueError('Absolute DEM has no readable elevation band.')
+        values = dataset.read(1).astype(np.float32)
+        valid = np.isfinite(values)
+        if dataset.nodata is not None:
+            valid &= ~np.isclose(values, dataset.nodata)
+        if not np.any(valid):
+            raise ValueError('Absolute DEM contains no valid elevation values.')
+        profile = dataset.profile.copy()
+        crs = dataset.crs
+        transform = dataset.transform
+        width = dataset.width
+        height = dataset.height
+        pixel_width = abs(transform.a)
+        pixel_height = abs(transform.e)
+
+    return values, valid, profile, crs, transform, width, height, pixel_width, pixel_height
+
+
+def resize_array(values, shape, order):
+    factors = (shape[0] / values.shape[0], shape[1] / values.shape[1])
+    resized = zoom(values, factors, order=order)
+    if resized.shape != shape:
+        resized = resized[:shape[0], :shape[1]]
+        padding = ((0, shape[0] - resized.shape[0]), (0, shape[1] - resized.shape[1]))
+        resized = np.pad(resized, padding, mode='edge')
+    return resized
+
+
+def elevation_summary(values):
+    minimum = float(np.min(values))
+    maximum = float(np.max(values))
+    return {
+        'minElevationMeters': minimum,
+        'maxElevationMeters': maximum,
+        'meanElevationMeters': float(np.mean(values)),
+        'maxReliefMeters': maximum - minimum,
+    }
 
 
 @app.post('/api/estimate-depth')
@@ -228,29 +295,117 @@ def process_dem():
 
     relative = None
     absolute = None
+    relative_path = None
+    absolute_path = None
 
     try:
         if relative_upload is not None:
             relative = file_metadata(relative_upload, ALLOWED_RELATIVE)
+            relative_upload.stream.seek(0)
+            relative_path = save_upload_for_processing(relative_upload, ALLOWED_RELATIVE)
         if absolute_upload is not None:
             absolute = file_metadata(absolute_upload, ALLOWED_ABSOLUTE)
+            absolute_upload.stream.seek(0)
+            absolute_path = save_upload_for_processing(absolute_upload, ALLOWED_ABSOLUTE)
     except ValueError as error:
         return jsonify({'error': str(error)}), 400
 
-    job_id = uuid.uuid4().hex
-    return jsonify({
-        'jobId': job_id,
-        'status': 'complete',
-        'relative': relative,
-        'absolute': absolute,
-        'result': {
-            'meshTriangles': 1_420_000,
-            'surveyAreaKm2': 42.5,
-            'maxReliefMeters': 2_730,
-            'interpolation': 'Bicubic Spline',
-            'resolution': '0.5m/pixel',
-        },
-    })
+    calibrated_output = None
+    try:
+        relative_values = load_relative_dem(relative_path) if relative_path else None
+        absolute_data = load_absolute_dem(absolute_path) if absolute_path else None
+        result = {'calibrated': False}
+
+        if relative_values is not None and absolute_data is not None:
+            absolute_values, absolute_valid, profile, crs, transform, absolute_width, absolute_height, pixel_width, pixel_height = absolute_data
+            absolute_resized = resize_array(absolute_values, relative_values.shape, order=1)
+            valid_resized = resize_array(absolute_valid.astype(np.float32), relative_values.shape, order=1) > 0.5
+            valid_overlap = valid_resized & np.isfinite(absolute_resized) & np.isfinite(relative_values)
+            if np.count_nonzero(valid_overlap) < 2:
+                raise ValueError('Insufficient valid overlapping data for relative-to-absolute calibration.')
+
+            relative_samples = relative_values[valid_overlap]
+            absolute_samples = absolute_resized[valid_overlap]
+            if np.unique(relative_samples).size < 2:
+                raise ValueError('Relative DEM does not contain enough variation for calibration.')
+            coefficients = np.polyfit(relative_samples, absolute_samples, 1)
+            calibrated_values = np.polyval(coefficients, relative_values).astype(np.float32)
+            if not np.all(np.isfinite(calibrated_values)):
+                raise ValueError('Linear calibration produced invalid elevation values.')
+
+            output_name = f'{uuid.uuid4().hex}.tif'
+            calibrated_output = Path(__file__).parent / 'static' / 'calibrated-dem' / output_name
+            calibrated_output.parent.mkdir(parents=True, exist_ok=True)
+            output_profile = profile.copy()
+            output_profile.update({
+                'driver': 'GTiff',
+                'height': calibrated_values.shape[0],
+                'width': calibrated_values.shape[1],
+                'count': 1,
+                'dtype': 'int16',
+                'nodata': -32768,
+                'compress': 'deflate',
+            })
+            import rasterio
+            with rasterio.open(calibrated_output, 'w', **output_profile) as destination:
+                destination.write(np.clip(np.round(calibrated_values), -32767, 32767).astype(np.int16), 1)
+
+            result.update({
+                'calibrated': True,
+                'meshTriangles': (relative_values.shape[1] - 1) * (relative_values.shape[0] - 1) * 2,
+                **elevation_summary(calibrated_values),
+                'interpolation': 'Bilinear reference resampling',
+                'resolution': f'{pixel_width:g}m/pixel' if pixel_width else None,
+            })
+            if crs is not None and pixel_width and pixel_height:
+                result['surveyAreaKm2'] = (absolute_width * pixel_width * absolute_height * pixel_height) / 1_000_000
+            else:
+                result.pop('surveyAreaKm2', None)
+            calibrated_url = f'/static/calibrated-dem/{output_name}'
+        elif relative_values is not None:
+            result.update({
+                'meshTriangles': max(0, (relative_values.shape[1] - 1) * (relative_values.shape[0] - 1) * 2),
+                'resolution': 'relative image pixels',
+            })
+            calibrated_url = None
+        else:
+            absolute_values, absolute_valid, _profile, crs, _transform, absolute_width, absolute_height, pixel_width, pixel_height = absolute_data
+            valid_values = absolute_values[absolute_valid]
+            result.update({
+                'calibrated': False,
+                'meshTriangles': max(0, (absolute_width - 1) * (absolute_height - 1) * 2),
+                **elevation_summary(valid_values),
+                'interpolation': 'Raw reference DEM',
+                'resolution': f'{pixel_width:g}m/pixel' if pixel_width else None,
+            })
+            if crs is not None and pixel_width and pixel_height:
+                result['surveyAreaKm2'] = (absolute_width * pixel_width * absolute_height * pixel_height) / 1_000_000
+            calibrated_url = None
+
+        response = {
+            'jobId': uuid.uuid4().hex,
+            'status': 'complete',
+            'relative': relative,
+            'absolute': absolute,
+            'result': result,
+        }
+        if calibrated_output is not None:
+            response['calibratedDemUrl'] = f'/static/calibrated-dem/{calibrated_output.name}'
+        return jsonify(response)
+    except (ImportError, OSError, ValueError) as error:
+        if calibrated_output is not None:
+            calibrated_output.unlink(missing_ok=True)
+        return jsonify({'error': str(error)}), 400
+    except Exception as error:
+        if calibrated_output is not None:
+            calibrated_output.unlink(missing_ok=True)
+        logging.getLogger(__name__).exception('DEM calibration failed: %s', error)
+        return jsonify({'error': 'DEM calibration failed. Check the uploaded raster data.'}), 500
+    finally:
+        if relative_path is not None:
+            relative_path.unlink(missing_ok=True)
+        if absolute_path is not None:
+            absolute_path.unlink(missing_ok=True)
 
 
 @app.errorhandler(413)

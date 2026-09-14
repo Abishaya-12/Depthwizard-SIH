@@ -4,6 +4,7 @@ numpy
 Pillow
 rasterio
 requests
+scipy
 scikit-learn
 torch
 transformers

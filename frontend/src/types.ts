@@ -33,10 +33,15 @@ export interface DemProcessingResponse {
   } | null;
   previewImage?: string | null;
   result: {
+    calibrated: boolean;
     meshTriangles: number;
-    surveyAreaKm2: number;
-    maxReliefMeters: number;
-    interpolation: string;
-    resolution: string;
+    surveyAreaKm2?: number;
+    minElevationMeters?: number;
+    maxElevationMeters?: number;
+    meanElevationMeters?: number;
+    maxReliefMeters?: number;
+    interpolation?: string;
+    resolution?: string;
   };
+  calibratedDemUrl?: string;
 }
