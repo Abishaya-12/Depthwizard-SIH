@@ -4,11 +4,13 @@ import hashlib
 import io
 import logging
 import os
+import math
 import tempfile
 import uuid
 
+import cv2
 import numpy as np
-from scipy.ndimage import gaussian_filter
+import requests
 
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
@@ -112,7 +114,7 @@ def estimate_depth():
 
         depth_values = np.asarray(depth_image, dtype=np.float32)
         sigma = max(image.width, image.height) / 150
-        depth_values = gaussian_filter(depth_values, sigma=sigma)
+        depth_values = cv2.bilateralFilter(depth_values, d=9, sigmaColor=30, sigmaSpace=sigma)
         minimum, maximum = np.percentile(depth_values, [2, 98])
         if maximum > minimum:
             depth_values = np.clip(depth_values, minimum, maximum)
@@ -136,6 +138,80 @@ def estimate_depth():
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
+
+
+@app.post('/api/fetch-dem-by-bbox')
+def fetch_dem_by_bbox():
+    payload = request.get_json(silent=True) or {}
+    try:
+        south = float(payload['south'])
+        north = float(payload['north'])
+        west = float(payload['west'])
+        east = float(payload['east'])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({'error': 'Provide south, north, west, and east as decimal numbers.'}), 400
+
+    if not all(math.isfinite(value) for value in (south, north, west, east)):
+        return jsonify({'error': 'Bounding box coordinates must be finite numbers.'}), 400
+    if not (-90 <= south < north <= 90 and -180 <= west < east <= 180):
+        return jsonify({'error': 'Bounding box coordinates are invalid or out of range.'}), 400
+    if north - south > 2 or east - west > 2:
+        return jsonify({'error': 'Bounding box must be no larger than 2 degrees in either dimension.'}), 400
+
+    api_key = os.getenv('OPENTOPOGRAPHY_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'Set OPENTOPOGRAPHY_API_KEY on the server before fetching DEM data.'}), 400
+
+    try:
+        response = requests.get(
+            'https://portal.opentopography.org/API/globaldem',
+            params={
+                'demtype': 'SRTMGL1',
+                'south': south,
+                'north': north,
+                'west': west,
+                'east': east,
+                'outputFormat': 'GTiff',
+                'API_Key': api_key,
+            },
+            timeout=60,
+        )
+        response.raise_for_status()
+    except requests.RequestException as error:
+        logging.getLogger(__name__).exception('OpenTopography DEM request failed: %s', error)
+        return jsonify({'error': 'OpenTopography could not provide DEM data for that area.'}), 502
+
+    output_name = f'{uuid.uuid4().hex}.tif'
+    output_path = DEPTH_OUTPUT_DIR / output_name
+    DEPTH_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(response.content)
+
+    preview_image = None
+    try:
+        import rasterio
+        from PIL import Image
+
+        with rasterio.open(output_path) as dataset:
+            dem_values = dataset.read(1, out_shape=(min(dataset.height, 512), min(dataset.width, 512)))
+        dem_values = np.asarray(dem_values, dtype=np.float32)
+        preview_min, preview_max = np.percentile(dem_values, [2, 98])
+        if preview_max > preview_min:
+            preview_values = np.clip(dem_values, preview_min, preview_max)
+            preview_values = (preview_values - preview_min) / (preview_max - preview_min)
+        else:
+            preview_values = np.zeros_like(dem_values)
+        preview = Image.fromarray(np.round(preview_values * 255).astype(np.uint8), mode='L')
+        preview_buffer = io.BytesIO()
+        preview.save(preview_buffer, format='PNG')
+        preview_image = 'data:image/png;base64,' + base64.b64encode(preview_buffer.getvalue()).decode('ascii')
+    except (ImportError, ValueError, OSError):
+        logging.getLogger(__name__).warning('DEM preview could not be generated for %s', output_path)
+
+    return jsonify({
+        'demUrl': f'/static/generated-depth/{output_name}',
+        'jobId': uuid.uuid4().hex,
+        'previewImage': preview_image,
+    })
 
 
 @app.get('/api/health')

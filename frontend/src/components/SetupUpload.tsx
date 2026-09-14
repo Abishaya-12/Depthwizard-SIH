@@ -1,6 +1,81 @@
-import React, { useState, useRef } from 'react';
-import { estimateDepthFromImage, processDemFiles } from '../api';
+import React, { useEffect, useRef, useState } from 'react';
+import L from 'leaflet';
+import { MapContainer, Rectangle, TileLayer, useMap } from 'react-leaflet';
+import { estimateDepthFromImage, fetchDemByBbox, processDemFiles } from '../api';
 import { DemProcessingResponse, TabId } from '../types';
+
+interface Bbox {
+  south: number;
+  north: number;
+  west: number;
+  east: number;
+}
+
+interface BboxDrawerProps {
+  onDraw: (bbox: Bbox | null) => void;
+}
+
+const BboxDrawer: React.FC<BboxDrawerProps> = ({ onDraw }) => {
+  const map = useMap();
+  const [bounds, setBounds] = useState<L.LatLngBounds | null>(null);
+  const startPointRef = useRef<L.LatLng | null>(null);
+  const onDrawRef = useRef(onDraw);
+
+  onDrawRef.current = onDraw;
+
+  useEffect(() => {
+    const container = map.getContainer();
+    let wasDraggingEnabled = true;
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      startPointRef.current = map.mouseEventToLatLng(event);
+      wasDraggingEnabled = map.dragging.enabled();
+      map.dragging.disable();
+      event.preventDefault();
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!startPointRef.current) return;
+      const currentPoint = map.mouseEventToLatLng(event);
+      setBounds(L.latLngBounds(startPointRef.current, currentPoint));
+    };
+
+    const handleMouseUp = (event: MouseEvent) => {
+      if (!startPointRef.current) return;
+      const currentPoint = map.mouseEventToLatLng(event);
+      const nextBounds = L.latLngBounds(startPointRef.current, currentPoint);
+      startPointRef.current = null;
+      if (wasDraggingEnabled) map.dragging.enable();
+
+      if (nextBounds.getNorth() - nextBounds.getSouth() < 0.001 || nextBounds.getEast() - nextBounds.getWest() < 0.001) {
+        setBounds(null);
+        onDrawRef.current(null);
+        return;
+      }
+
+      setBounds(nextBounds);
+      onDrawRef.current({
+        south: nextBounds.getSouth(),
+        north: nextBounds.getNorth(),
+        west: nextBounds.getWest(),
+        east: nextBounds.getEast(),
+      });
+    };
+
+    container.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (startPointRef.current && wasDraggingEnabled) map.dragging.enable();
+    };
+  }, [map]);
+
+  return bounds ? <Rectangle bounds={bounds} pathOptions={{ color: '#00e5ff', weight: 2 }} /> : null;
+};
 
 interface SetupUploadProps {
   onNavigate: (tab: TabId) => void;
@@ -19,6 +94,8 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
   const [datumModel, setDatumModel] = useState('Lunar Sphere R=1737.4 km');
   const [calibSource, setCalibSource] = useState('LOLA + CE-2 Altimetry');
   const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [bbox, setBbox] = useState<Bbox | null>(null);
+  const [isFetchingDem, setIsFetchingDem] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fileInput1Ref = useRef<HTMLInputElement | null>(null);
@@ -67,6 +144,30 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
     const response = await fetch(dataUrl);
     const blob = await response.blob();
     return new File([blob], filename, { type: 'image/png' });
+  };
+
+  const handleFetchDem = async () => {
+    if (!bbox) return;
+
+    setIsFetchingDem(true);
+    setError(null);
+    try {
+      const result = await fetchDemByBbox(bbox);
+      const response = await fetch(result.demUrl);
+      if (!response.ok) throw new Error('The fetched DEM file could not be downloaded.');
+      const demFile = new File([await response.blob()], `bhuvan-dem-${result.jobId}.tif`, { type: 'image/tiff' });
+      setAbsoluteFile(demFile);
+      setPreviewImage(result.previewImage ?? null);
+      setFileLayer2({
+        name: demFile.name,
+        size: `${(demFile.size / (1024 * 1024)).toFixed(1)} MB • Downloaded • GeoTIFF WGS84`,
+        verified: true,
+      });
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'DEM area fetch failed.');
+    } finally {
+      setIsFetchingDem(false);
+    }
   };
 
   const handleSynthesize = async () => {
@@ -237,8 +338,9 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
       {/* ISRO BHUVAN MAP NAVIGATION */}
       <section className="relative w-full overflow-hidden rounded-xl bg-[#080f18] p-6 sm:p-8 shadow-2xl border border-[#3b494c]/20">
         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#00e5ff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="max-w-2xl">
+        <div className="relative z-10 flex flex-col gap-5">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div className="max-w-2xl">
             <div className="flex items-center gap-2 mb-3">
               <span className="material-symbols-outlined text-[#00e5ff] text-[22px]">public</span>
               <span className="font-label-caps text-[10px] text-[#4cd6fb] uppercase tracking-widest">
@@ -249,23 +351,44 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
               Navigate in Bhuvan
             </h2>
             <p className="font-body-md text-[14px] text-[#bac9cc] mt-2 leading-relaxed">
-              Open ISRO&apos;s official Bhuvan portal to explore satellite imagery, terrain layers, and geospatial data before selecting your DEM files.
+              Draw a small area on the map to fetch an SRTM elevation raster directly into the absolute DEM layer.
             </p>
           </div>
-          <a
-            href="https://bhuvan.nrsc.gov.in/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 shrink-0 bg-[#00e5ff] text-[#00363d] px-6 py-3 rounded-full font-mono-telemetry text-[13px] font-bold tracking-wider uppercase transition-all shadow-[0_0_20px_rgba(0,229,255,0.35)] hover:bg-[#c3f5ff] hover:shadow-[0_0_30px_rgba(0,229,255,0.65)]"
-          >
-            <span>Open Bhuvan Map</span>
-            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-          </a>
+            <div className="flex items-center gap-3">
+              <span className="font-mono-coordinate text-[11px] text-[#849396]">DRAG TO DRAW AREA</span>
+              <a href="https://bhuvan.nrsc.gov.in/" target="_blank" rel="noopener noreferrer" className="font-mono-coordinate text-[11px] text-[#4cd6fb] underline underline-offset-2 hover:text-[#c3f5ff]">
+                Open full Bhuvan portal
+              </a>
+            </div>
+          </div>
+          <div className="h-[400px] overflow-hidden rounded-lg border border-[#3b494c]/40">
+            <MapContainer center={[20.5937, 78.9629]} zoom={5} scrollWheelZoom className="h-full w-full">
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <BboxDrawer onDraw={setBbox} />
+            </MapContainer>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-[#151c26]/80 rounded-lg px-4 py-3 border border-[#3b494c]/30">
+            <span className="font-mono-coordinate text-[11px] text-[#bac9cc]">
+              {bbox ? `S ${bbox.south.toFixed(3)} | N ${bbox.north.toFixed(3)} | W ${bbox.west.toFixed(3)} | E ${bbox.east.toFixed(3)}` : 'NO AREA SELECTED'}
+            </span>
+            <button
+              type="button"
+              onClick={handleFetchDem}
+              disabled={!bbox || isFetchingDem}
+              className="inline-flex items-center justify-center gap-2 bg-[#00e5ff] text-[#00363d] px-5 py-2.5 rounded-full font-mono-telemetry text-[12px] font-bold tracking-wider uppercase transition-all hover:bg-[#c3f5ff] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span>{isFetchingDem ? 'Fetching DEM...' : 'Fetch DEM for this area'}</span>
+              <span className={`material-symbols-outlined text-[17px] ${isFetchingDem ? 'animate-spin' : ''}`}>{isFetchingDem ? 'sync' : 'download'}</span>
+            </button>
+          </div>
         </div>
         <div className="relative z-10 mt-6 pt-4 border-t border-[#3b494c]/30 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono-coordinate text-[11px] text-[#849396]">
           <span>PROVIDER: ISRO / NRSC</span>
-          <span>MODE: EXTERNAL MAP NAVIGATION</span>
-          <span className="text-[#4cd6fb]">SOURCE: BHUVAN.NRSC.GOV.IN</span>
+          <span>DATA: OPENTOPOGRAPHY SRTMGL1</span>
+          <span className="text-[#4cd6fb]">MAP: OPENSTREETMAP BASEMAP</span>
         </div>
       </section>
 

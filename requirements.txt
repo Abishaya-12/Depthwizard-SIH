@@ -3,7 +3,8 @@ matplotlib
 numpy
 Pillow
 rasterio
-scipy
+requests
 scikit-learn
 torch
 transformers
+opencv-python-headless
