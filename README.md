@@ -1,5 +1,5 @@
 <div align="center">
-<img width="1200" height="475" alt="DepthWizard logo" src="../Logo.jpeg" />
+<img width="1200" height="475" alt="DepthWizard logo" src="Logo.jpeg" />
 </div>
 
 # DepthWizard
