@@ -79,10 +79,11 @@ const BboxDrawer: React.FC<BboxDrawerProps> = ({ onDraw }) => {
 
 interface SetupUploadProps {
   onNavigate: (tab: TabId) => void;
+  onOriginalPhotoChange: (url: string | null) => void;
   onProcessed: (result: DemProcessingResponse) => void;
 }
 
-export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcessed }) => {
+export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onOriginalPhotoChange, onProcessed }) => {
   const [fileLayer1, setFileLayer1] = useState<{ name: string; size: string; verified: boolean } | null>(null);
   const [fileLayer2, setFileLayer2] = useState<{ name: string; size: string; verified: boolean } | null>(null);
   const [relativeFile, setRelativeFile] = useState<File | null>(null);
@@ -106,6 +107,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
   const handleFile1Upload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      onOriginalPhotoChange(null);
       const url = URL.createObjectURL(file);
       setPreviewImage(url);
       setFileLayer1({
@@ -133,6 +135,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
     const file = e.target.files?.[0];
     if (file) {
       setRgbFile(file);
+      onOriginalPhotoChange(URL.createObjectURL(file));
       setFileLayer1({
         name: file.name,
         size: `${(file.size / (1024 * 1024)).toFixed(1)} MB • RGB PHOTO • READY FOR AI DEPTH`,
@@ -158,6 +161,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
       if (!response.ok) throw new Error('The fetched DEM file could not be downloaded.');
       const demFile = new File([await response.blob()], `bhuvan-dem-${result.jobId}.tif`, { type: 'image/tiff' });
       setAbsoluteFile(demFile);
+      onOriginalPhotoChange(null);
       setPreviewImage(result.previewImage ?? null);
       setFileLayer2({
         name: demFile.name,

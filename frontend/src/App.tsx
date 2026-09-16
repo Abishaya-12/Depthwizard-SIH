@@ -13,6 +13,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [processingResult, setProcessingResult] = useState<DemProcessingResponse | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [originalPhotoUrl, setOriginalPhotoUrl] = useState<string | null>(null);
   const [zExaggeration, setZExaggeration] = useState(0.7);
 
   return (
@@ -62,6 +63,7 @@ export default function App() {
           {activeTab === 'setup-upload' && (
             <SetupUpload
               onNavigate={setActiveTab}
+              onOriginalPhotoChange={setOriginalPhotoUrl}
               onProcessed={(result) => {
                 setProcessingResult(result);
                 setPreviewImage(result.previewImage ?? null);
@@ -77,6 +79,7 @@ export default function App() {
             <DemViewport
               onNavigate={setActiveTab}
               previewImage={previewImage}
+              originalPhotoUrl={originalPhotoUrl}
               processingResult={processingResult}
               zExaggeration={zExaggeration}
               setZExaggeration={setZExaggeration}
@@ -87,6 +90,7 @@ export default function App() {
             <FlythroughPath
               onNavigate={setActiveTab}
               previewImage={previewImage}
+              originalPhotoUrl={originalPhotoUrl}
               zExaggeration={zExaggeration}
             />
           )}

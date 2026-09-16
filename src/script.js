@@ -155,8 +155,9 @@ export function createTerrainEngine(container, config = {}) {
     scene.add(terrain)
 
     let terrainTexture = null
-    if (config.heightMap) {
-        new THREE.TextureLoader().load(config.heightMap, (texture) => {
+    const textureMap = config.textureMap || config.heightMap
+    if (textureMap) {
+        new THREE.TextureLoader().load(textureMap, (texture) => {
             texture.colorSpace = THREE.SRGBColorSpace
             terrainTexture = texture
             terrainMaterial.map = texture
@@ -175,7 +176,7 @@ export function createTerrainEngine(container, config = {}) {
         : null
     if (followLight) scene.add(followLight)
 
-    const path = new THREE.CatmullRomCurve3([
+    let path = new THREE.CatmullRomCurve3([
         new THREE.Vector3(-5, 2.5, 5), new THREE.Vector3(-2, 2, 2),
         new THREE.Vector3(1, 2.3, 0), new THREE.Vector3(3, 2.1, -2),
         new THREE.Vector3(5, 2.8, -5),
@@ -194,12 +195,15 @@ export function createTerrainEngine(container, config = {}) {
         const rayDirection = new THREE.Vector3(0, -1, 0)
         const clearance = 1.5
 
-        for (const point of path.points) {
+        const shapePoints = path.getPoints(40)
+        for (const point of shapePoints) {
             rayOrigin.set(point.x, 100, point.z)
             raycaster.set(rayOrigin, rayDirection)
             const hit = raycaster.intersectObject(terrain, false)[0]
             if (hit) point.y = hit.point.y + clearance
         }
+
+        path = new THREE.CatmullRomCurve3(shapePoints)
 
         pathLine.geometry.dispose()
         pathLine.geometry = new THREE.BufferGeometry().setFromPoints(path.getPoints(80))

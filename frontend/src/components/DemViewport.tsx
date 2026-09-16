@@ -5,6 +5,7 @@ import { createTerrainEngine } from '../../../src/script.js';
 interface DemViewportProps {
   onNavigate: (tab: TabId) => void;
   previewImage?: string | null;
+  originalPhotoUrl?: string | null;
   processingResult: DemProcessingResponse | null;
   zExaggeration: number;
   setZExaggeration: React.Dispatch<React.SetStateAction<number>>;
@@ -13,6 +14,7 @@ interface DemViewportProps {
 export const DemViewport: React.FC<DemViewportProps> = ({
   onNavigate,
   previewImage,
+  originalPhotoUrl,
   processingResult,
   zExaggeration,
   setZExaggeration,
@@ -45,9 +47,10 @@ export const DemViewport: React.FC<DemViewportProps> = ({
       mode: 'viewer',
       wireframe: true,
       heightMap: previewImage ?? undefined,
+      textureMap: originalPhotoUrl ?? previewImage ?? undefined,
     });
     return () => engineRef.current?.destroy();
-  }, [previewImage]);
+  }, [previewImage, originalPhotoUrl]);
 
   useEffect(() => {
     engineRef.current?.update({
