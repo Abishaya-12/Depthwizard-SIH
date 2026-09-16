@@ -3,5 +3,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "start": "node start.js"
+  },
+  "dependencies": {
+    "all": "^0.0.0"
   }
 }
