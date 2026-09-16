@@ -255,7 +255,7 @@ export const MeshProcessing: React.FC<MeshProcessingProps> = ({ onNavigate, proc
 
       {/* Secondary Processing Telemetry Bar & Launch Action Area */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-[#151c26]/70 backdrop-blur-md p-4 rounded-xl shadow-lg border border-[#3b494c]/20">
-        <div className="col-span-1 md:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="col-span-1 md:col-span-8 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
           <div className="flex flex-col p-2 bg-[#080f18]/70 rounded border border-[#3b494c]/20">
             <span className="font-label-caps text-[10px] text-[#849396] uppercase">Interpolation</span>
             <span className="font-mono-telemetry text-[13px] text-[#c3f5ff] font-semibold truncate">{processingResult?.result.interpolation ?? 'Awaiting synthesis'}</span>
@@ -271,6 +271,26 @@ export const MeshProcessing: React.FC<MeshProcessingProps> = ({ onNavigate, proc
           <div className="flex flex-col p-2 bg-[#080f18]/70 rounded border border-[#3b494c]/20">
             <span className="font-label-caps text-[10px] text-[#849396] uppercase">Max Relief Delta</span>
             <span className="font-mono-telemetry text-[13px] text-[#e1eeff] font-semibold truncate">{processingResult?.result.maxReliefMeters !== undefined ? `Δ ${processingResult.result.maxReliefMeters.toLocaleString()} m` : '--'}</span>
+          </div>
+          <div className="flex flex-col p-2 bg-[#080f18]/70 rounded border border-[#3b494c]/20">
+            <span className="font-label-caps text-[10px] text-[#849396] uppercase">Minimum Elevation</span>
+            <span className="font-mono-telemetry text-[13px] text-[#dce3f0] font-semibold truncate">{processingResult?.result.minElevationMeters !== undefined ? `${processingResult.result.minElevationMeters.toLocaleString()} m` : '--'}</span>
+          </div>
+          <div className="flex flex-col p-2 bg-[#080f18]/70 rounded border border-[#3b494c]/20">
+            <span className="font-label-caps text-[10px] text-[#849396] uppercase">Maximum Elevation</span>
+            <span className="font-mono-telemetry text-[13px] text-[#dce3f0] font-semibold truncate">{processingResult?.result.maxElevationMeters !== undefined ? `${processingResult.result.maxElevationMeters.toLocaleString()} m` : '--'}</span>
+          </div>
+          <div className="flex flex-col p-2 bg-[#080f18]/70 rounded border border-[#3b494c]/20">
+            <span className="font-label-caps text-[10px] text-[#849396] uppercase">Calibration RMSE</span>
+            <span className="font-mono-telemetry text-[13px] text-[#dce3f0] font-semibold truncate">{processingResult?.result.rmseMeters !== undefined ? `${processingResult.result.rmseMeters.toLocaleString()} m` : '--'}</span>
+          </div>
+          <div className="flex flex-col p-2 bg-[#080f18]/70 rounded border border-[#3b494c]/20">
+            <span className="font-label-caps text-[10px] text-[#849396] uppercase">Calibration MAE</span>
+            <span className="font-mono-telemetry text-[13px] text-[#dce3f0] font-semibold truncate">{processingResult?.result.maeMeters !== undefined ? `${processingResult.result.maeMeters.toLocaleString()} m` : '--'}</span>
+          </div>
+          <div className="flex flex-col p-2 bg-[#080f18]/70 rounded border border-[#3b494c]/20">
+            <span className="font-label-caps text-[10px] text-[#849396] uppercase">Correlation</span>
+            <span className="font-mono-telemetry text-[13px] text-[#dce3f0] font-semibold truncate">{processingResult?.result.correlationCoefficient !== undefined ? processingResult.result.correlationCoefficient.toFixed(3) : '--'}</span>
           </div>
         </div>
 

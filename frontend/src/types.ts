@@ -40,6 +40,9 @@ export interface DemProcessingResponse {
     maxElevationMeters?: number;
     meanElevationMeters?: number;
     maxReliefMeters?: number;
+    rmseMeters?: number;
+    maeMeters?: number;
+    correlationCoefficient?: number;
     interpolation?: string;
     resolution?: string;
   };

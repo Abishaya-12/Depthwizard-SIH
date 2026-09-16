@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { TabId } from '../types';
+import { DemProcessingResponse, TabId } from '../types';
 import { createTerrainEngine } from '../../../src/script.js';
 
 interface DemViewportProps {
   onNavigate: (tab: TabId) => void;
   previewImage?: string | null;
+  processingResult: DemProcessingResponse | null;
   zExaggeration: number;
   setZExaggeration: React.Dispatch<React.SetStateAction<number>>;
 }
@@ -12,6 +13,7 @@ interface DemViewportProps {
 export const DemViewport: React.FC<DemViewportProps> = ({
   onNavigate,
   previewImage,
+  processingResult,
   zExaggeration,
   setZExaggeration,
 }) => {
@@ -30,6 +32,9 @@ export const DemViewport: React.FC<DemViewportProps> = ({
   const [solarZenith, setSolarZenith] = useState(42);
   const [cursorAlt, setCursorAlt] = useState(1420);
   const [cursorPinTop, setCursorPinTop] = useState(48);
+  const minElevation = processingResult?.result.minElevationMeters;
+  const maxElevation = processingResult?.result.maxElevationMeters;
+  const formatElevation = (value?: number) => value === undefined ? '--m' : `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}m`;
 
   const isDraggingRef = useRef(false);
   const lastMouseRef = useRef({ x: 0, y: 0 });
@@ -91,7 +96,9 @@ export const DemViewport: React.FC<DemViewportProps> = ({
           e.clientY <= rect.bottom
         ) {
           const relY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-          const simAlt = Math.round(2894 - relY * (2894 - 142));
+          const maximum = maxElevation ?? 0;
+          const minimum = minElevation ?? 0;
+          const simAlt = Math.round(maximum - relY * (maximum - minimum));
           setCursorAlt(simAlt);
           setCursorPinTop(relY * 100);
         }
@@ -323,20 +330,20 @@ export const DemViewport: React.FC<DemViewportProps> = ({
                   <path d="M 80 140 Q 180 80 280 120 T 430 90" stroke="#00daf3" strokeWidth="1.2" opacity="0.7"></path>
                   <path d="M 120 400 C 180 350, 270 410, 340 360 C 400 320, 430 350, 460 330" stroke="#4cd6fb" strokeWidth="1" opacity="0.6"></path>
 
-                  {/* Elevation Callout: Peak (+2,894m ASL) */}
+                  {/* Elevation Callout: Peak */}
                   <g transform="translate(245, 185)">
                     <line x1="0" y1="0" x2="0" y2="-48" stroke="#ffffff" strokeWidth="1.8"></line>
                     <circle cx="0" cy="-48" r="4" fill="#00e5ff"></circle>
                     <rect x="8" y="-60" width="118" height="24" rx="3" fill="#050b14" fillOpacity="0.95" stroke="#00e5ff" strokeWidth="0.8" strokeOpacity="0.5"></rect>
-                    <text x="14" y="-44" fill="#c3f5ff" fontFamily="JetBrains Mono" fontSize="9.5" fontWeight="700">PEAK: +2,894m ASL</text>
+                    <text x="14" y="-44" fill="#c3f5ff" fontFamily="JetBrains Mono" fontSize="9.5" fontWeight="700">PEAK: {formatElevation(maxElevation)} ASL</text>
                   </g>
 
-                  {/* Elevation Callout: Basin Rim (+142m) */}
+                  {/* Elevation Callout: Basin Rim */}
                   <g transform="translate(130, 295)">
                     <line x1="0" y1="0" x2="0" y2="-32" stroke="#4cd6fb" strokeWidth="1.2" strokeDasharray="2 2"></line>
                     <circle cx="0" cy="-32" r="3" fill="#4cd6fb"></circle>
                     <rect x="8" y="-43" width="98" height="22" rx="3" fill="#050b14" fillOpacity="0.95" stroke="#4cd6fb" strokeWidth="0.8" strokeOpacity="0.4"></rect>
-                    <text x="14" y="-28" fill="#849396" fontFamily="JetBrains Mono" fontSize="9" fontWeight="600">BASE: +142m</text>
+                    <text x="14" y="-28" fill="#849396" fontFamily="JetBrains Mono" fontSize="9" fontWeight="600">BASE: {formatElevation(minElevation)}</text>
                   </g>
 
                   {/* Rotating Central Reticle */}
@@ -368,7 +375,7 @@ export const DemViewport: React.FC<DemViewportProps> = ({
 
             {/* Vertical Elevation Scale & Meter Bar */}
             <div className="absolute left-4 top-20 bottom-20 w-16 bg-[#151c26]/90 backdrop-blur-md rounded-lg p-2 flex flex-col items-center justify-between shadow-xl z-20 pointer-events-auto border border-[#3b494c]/30">
-              <span className="font-label-caps text-[10px] text-[#dce3f0] font-bold">2,894m</span>
+              <span className="font-label-caps text-[10px] text-[#dce3f0] font-bold">{formatElevation(maxElevation)}</span>
               <div className="relative w-3 flex-1 my-2 rounded-full overflow-hidden bg-[#2e353f] flex flex-col justify-between items-center py-1">
                 <div className="absolute inset-0 bg-gradient-to-b from-white via-[#c3f5ff] to-[#151c26] opacity-90"></div>
                 <div className="w-full h-[1px] bg-[#0d141d] z-10 opacity-60"></div>
@@ -381,7 +388,7 @@ export const DemViewport: React.FC<DemViewportProps> = ({
                   style={{ top: `${cursorPinTop}%` }}
                 ></div>
               </div>
-              <span className="font-label-caps text-[10px] text-[#bac9cc]">142m</span>
+              <span className="font-label-caps text-[10px] text-[#bac9cc]">{formatElevation(minElevation)}</span>
               <span className="font-mono-coordinate text-[10px] text-[#4cd6fb] mt-1">ASL (m)</span>
             </div>
 
@@ -464,7 +471,7 @@ export const DemViewport: React.FC<DemViewportProps> = ({
               </div>
               <div className="flex items-center justify-between p-2.5">
                 <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Elevation Range</span>
-                <span className="font-mono-telemetry text-[13px] text-[#c3f5ff] font-bold">142m — 2,894m ASL</span>
+                <span className="font-mono-telemetry text-[13px] text-[#c3f5ff] font-bold">{formatElevation(minElevation)} — {formatElevation(maxElevation)} ASL</span>
               </div>
               <div className="flex items-center justify-between p-2.5 bg-[#19202a]/30">
                 <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Spatial Res (GSD)</span>

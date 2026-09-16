@@ -77,6 +77,7 @@ export default function App() {
             <DemViewport
               onNavigate={setActiveTab}
               previewImage={previewImage}
+              processingResult={processingResult}
               zExaggeration={zExaggeration}
               setZExaggeration={setZExaggeration}
             />

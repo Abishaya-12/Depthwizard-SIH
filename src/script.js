@@ -138,7 +138,7 @@ export function createTerrainEngine(container, config = {}) {
     renderer.domElement.style.cssText = 'width:100%;height:100%;display:block'
 
     const terrainMaterial = new THREE.MeshStandardMaterial({
-        color: '#6bc8d8',
+        color: '#ffffff',
         roughness: 0.82,
         metalness: 0.05,
         wireframe: config.wireframe ?? false,
@@ -153,6 +153,16 @@ export function createTerrainEngine(container, config = {}) {
     )
     terrain.rotation.x = -Math.PI / 2
     scene.add(terrain)
+
+    let terrainTexture = null
+    if (config.heightMap) {
+        new THREE.TextureLoader().load(config.heightMap, (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace
+            terrainTexture = texture
+            terrainMaterial.map = texture
+            terrainMaterial.needsUpdate = true
+        })
+    }
 
     const grid = new THREE.GridHelper(options.width, 28, '#16879a', '#0d3745')
     grid.position.y = -1.7
@@ -393,6 +403,7 @@ export function createTerrainEngine(container, config = {}) {
             window.removeEventListener('mouseup', mouseUp)
             terrain.geometry.dispose()
             terrain.material.dispose()
+            terrainTexture?.dispose()
             pathLine.geometry.dispose()
             pathLine.material.dispose()
             if (followLight) {

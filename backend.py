@@ -11,6 +11,8 @@ import uuid
 import cv2
 import numpy as np
 import requests
+from sklearn.linear_model import HuberRegressor
+from sklearn.model_selection import train_test_split
 from scipy.ndimage import zoom
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -328,10 +330,37 @@ def process_dem():
             absolute_samples = absolute_resized[valid_overlap]
             if np.unique(relative_samples).size < 2:
                 raise ValueError('Relative DEM does not contain enough variation for calibration.')
-            coefficients = np.polyfit(relative_samples, absolute_samples, 1)
-            calibrated_values = np.polyval(coefficients, relative_values).astype(np.float32)
+            validation_metrics = {}
+            if relative_samples.size >= 50:
+                relative_train, relative_test, absolute_train, absolute_test = train_test_split(
+                    relative_samples,
+                    absolute_samples,
+                    test_size=0.2,
+                    random_state=42,
+                )
+            else:
+                relative_train = relative_samples
+                absolute_train = absolute_samples
+                relative_test = None
+                absolute_test = None
+
+            huber = HuberRegressor()
+            huber.fit(relative_train.reshape(-1, 1), absolute_train)
+            calibrated_values = (huber.coef_[0] * relative_values + huber.intercept_).astype(np.float32)
+            if relative_test is not None and absolute_test is not None:
+                test_predictions = huber.predict(relative_test.reshape(-1, 1))
+                residuals = test_predictions - absolute_test
+                if np.std(test_predictions) > 0 and np.std(absolute_test) > 0:
+                    correlation = float(np.corrcoef(test_predictions, absolute_test)[0, 1])
+                else:
+                    correlation = None
+                validation_metrics = {
+                    'rmseMeters': float(np.sqrt(np.mean(residuals ** 2))),
+                    'maeMeters': float(np.mean(np.abs(residuals))),
+                    'correlationCoefficient': correlation,
+                }
             if not np.all(np.isfinite(calibrated_values)):
-                raise ValueError('Linear calibration produced invalid elevation values.')
+                raise ValueError('Robust calibration produced invalid elevation values.')
 
             output_name = f'{uuid.uuid4().hex}.tif'
             calibrated_output = Path(__file__).parent / 'static' / 'calibrated-dem' / output_name
@@ -354,6 +383,7 @@ def process_dem():
                 'calibrated': True,
                 'meshTriangles': (relative_values.shape[1] - 1) * (relative_values.shape[0] - 1) * 2,
                 **elevation_summary(calibrated_values),
+                **validation_metrics,
                 'interpolation': 'Bilinear reference resampling',
                 'resolution': f'{pixel_width:g}m/pixel' if pixel_width else None,
             })

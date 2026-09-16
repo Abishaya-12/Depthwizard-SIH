@@ -97,6 +97,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
   const [bbox, setBbox] = useState<Bbox | null>(null);
   const [isFetchingDem, setIsFetchingDem] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mapLayer, setMapLayer] = useState<'standard' | 'satellite'>('standard');
 
   const fileInput1Ref = useRef<HTMLInputElement | null>(null);
   const rgbInputRef = useRef<HTMLInputElement | null>(null);
@@ -361,12 +362,44 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
               </a>
             </div>
           </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-label-caps text-[10px] text-[#849396] uppercase tracking-wider">
+              Basemap: {mapLayer === 'satellite' ? 'Satellite imagery' : 'Street map'}
+            </span>
+            <div className="flex items-center gap-1 rounded-lg border border-[#3b494c]/40 bg-[#151c26]/90 p-1">
+              <button
+                type="button"
+                onClick={() => setMapLayer('standard')}
+                className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 font-mono-coordinate text-[11px] uppercase transition-colors ${mapLayer === 'standard' ? 'bg-[#00e5ff] text-[#00363d] font-bold' : 'text-[#bac9cc] hover:bg-[#242a34] hover:text-[#dce3f0]'}`}
+                aria-pressed={mapLayer === 'standard'}
+              >
+                <span className="material-symbols-outlined text-[15px]">map</span>
+                Standard
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapLayer('satellite')}
+                className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 font-mono-coordinate text-[11px] uppercase transition-colors ${mapLayer === 'satellite' ? 'bg-[#00e5ff] text-[#00363d] font-bold' : 'text-[#bac9cc] hover:bg-[#242a34] hover:text-[#dce3f0]'}`}
+                aria-pressed={mapLayer === 'satellite'}
+              >
+                <span className="material-symbols-outlined text-[15px]">satellite</span>
+                Satellite
+              </button>
+            </div>
+          </div>
           <div className="h-[400px] overflow-hidden rounded-lg border border-[#3b494c]/40">
             <MapContainer center={[20.5937, 78.9629]} zoom={5} scrollWheelZoom className="h-full w-full">
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
+              {mapLayer === 'satellite' ? (
+                <TileLayer
+                  attribution='&copy; <a href="https://www.esri.com/en-us/legal/terms/services-description">Esri</a>'
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                />
+              ) : (
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+              )}
               <BboxDrawer onDraw={setBbox} />
             </MapContainer>
           </div>
@@ -388,7 +421,7 @@ export const SetupUpload: React.FC<SetupUploadProps> = ({ onNavigate, onProcesse
         <div className="relative z-10 mt-6 pt-4 border-t border-[#3b494c]/30 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono-coordinate text-[11px] text-[#849396]">
           <span>PROVIDER: ISRO / NRSC</span>
           <span>DATA: OPENTOPOGRAPHY SRTMGL1</span>
-          <span className="text-[#4cd6fb]">MAP: OPENSTREETMAP BASEMAP</span>
+          <span className="text-[#4cd6fb]">MAP: {mapLayer === 'satellite' ? 'ESRI SATELLITE IMAGERY' : 'OPENSTREETMAP BASEMAP'}</span>
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { TabId } from '../types';
+import logo from '../../../Logo.jpeg';
 
 interface HeaderProps {
   activeTab: TabId;
@@ -26,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onSelectTab }) => {
           <img 
             alt="DepthWizard ISRO Logo" 
             className="h-8 w-auto object-contain" 
-            src="https://lh3.googleusercontent.com/aida/AEtjO1VRINbdxtNFoMXxngSp_b0eHuYCArOzioq5TbwlJYDqXBI22Xddf3nos0luoy6xOAvamzz0_avcZPKi-6OTKwkxJN0WxEitTJAvEDY8zAVWFuAa8zBiLtv6MLjKBni2JaTH1wwrKBxequKDJ1iNwc8Q85zaD6LuySyNd557L-isbK7L6RJpBywWLQ1lnzpzTdkAJ-yAkf6eRUUEBxuGJ3oZ63XoYKzGXm-fIikFUuA2y7V9Zowl4obSN1Y" 
+            src={logo}
           />
           <div className="flex flex-col">
             <span className="font-headline-sm text-[18px] text-[#c3f5ff] tracking-tight font-bold">
