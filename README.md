@@ -1,10 +1,8 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+<img width="1200" height="475" alt="DepthWizard logo" src="../Logo.jpeg" />
 </div>
 
-# Run and deploy your AI Studio app
-
-DepthWizard
+# DepthWizard
 
 DepthWizard is an interactive ISRO-inspired digital elevation model (DEM) workspace. It combines a React operations interface, a Flask upload API, and a shared Three.js terrain engine for inspecting generated terrain and flying through the same terrain path.
 
@@ -160,5 +158,3 @@ static/                    Runtime-generated DEM and calibrated raster files
 ## Current Scope
 
 The Flask endpoint currently validates, hashes, and inspects uploads, then returns the processing metadata contract used by the UI. The Three.js engine currently generates a procedural terrain surface and shared flythrough path. A production raster-to-mesh pipeline can replace the backend result generation while preserving the existing frontend API contract and engine mount points.
-
-View your app in AI Studio: https://ai.studio/apps/7e556b88-b6db-41af-89d1-1d97b0459f45
