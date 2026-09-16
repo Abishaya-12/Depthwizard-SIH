@@ -67,40 +67,47 @@ From the repository root:
 
 ```powershell
 python -m pip install -r requirements.txt
-Push-Location frontend
 npm install
-Pop-Location
+Copy-Item .env.example .env
 ```
+
+`npm install` is run from the repository root. The root npm workspace installs the
+frontend dependencies from `frontend/package.json`, including Vite, in one step.
+The copied `.env` file is local-only and is ignored by Git. Add an
+`OPENTOPOGRAPHY_API_KEY` there only if you use the bounding-box DEM download.
+For another computer, copy the `.env` file securely or create it again from
+`.env.example`; never commit it.
 
 ## Run Locally
 
-Start the Flask API in one terminal:
+```powershell
+npm start
+```
+
+The production frontend is built automatically and Flask serves the complete app at
+`http://127.0.0.1:5000`.
+
+The normal runtime does not require Vite to be running. Vite is used only during
+the build, so deployment needs `npm install`, `npm run build`, and the Python
+dependencies; Flask then serves `frontend/dist`.
+
+For a deployment environment, configure `OPENTOPOGRAPHY_API_KEY`, `HOST`, and
+`PORT` as platform environment variables instead of committing a `.env` file.
+Start the server with:
 
 ```powershell
 python backend.py
 ```
 
-The API runs at `http://127.0.0.1:5000`.
-
-Start the React frontend in another terminal:
-
-```powershell
-Push-Location frontend
-npm run dev
-Pop-Location
-```
-
-Open `http://localhost:3000/`. Vite proxies `/api` requests to the Flask server.
-
 ## Frontend Commands
 
-Run these from `frontend`:
+Run these from the repository root:
 
 ```powershell
-npm run dev       # Start the Vite development server
-npm run lint      # Run the TypeScript check
-npm run build     # Create a production build
-npm run preview   # Preview the production build
+npm run lint                         # Run the TypeScript check
+npm run build                        # Create a production build
+npm run --workspace frontend dev     # Start Vite with API proxy for development
+npm run --workspace frontend preview # Preview the production build
 ```
 
 ## API
@@ -156,13 +163,3 @@ The Flask endpoint currently validates, hashes, and inspects uploads, then retur
 
 View your app in AI Studio: https://ai.studio/apps/7e556b88-b6db-41af-89d1-1d97b0459f45
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`

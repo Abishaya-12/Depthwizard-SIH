@@ -1,10 +1,12 @@
 {
   "private": true,
   "license": "UNLICENSED",
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
-    "start": "node start.js"
-  },
-  "dependencies": {
-    "all": "^0.0.0"
+    "start": "node start.js",
+    "build": "npm run build --workspace frontend",
+    "lint": "npm run lint --workspace frontend"
   }
 }

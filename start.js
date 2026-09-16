@@ -1,13 +1,11 @@
 const { spawn, spawnSync } = require('child_process');
-const path = require('path');
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const root = __dirname;
-const frontendDir = path.join(root, 'frontend');
 
 console.log('Building frontend...');
-const build = spawnSync(npmCommand, ['run', 'build'], {
-  cwd: frontendDir,
+const build = spawnSync(npmCommand, ['run', 'build', '--workspace', 'frontend'], {
+  cwd: root,
   stdio: 'inherit',
   shell: true,
 });

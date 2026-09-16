@@ -16,7 +16,10 @@ from sklearn.model_selection import train_test_split
 from scipy.ndimage import zoom
 
 from flask import Flask, jsonify, request, send_from_directory
+from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
+
+load_dotenv(Path(__file__).parent / '.env')
 
 FRONTEND_DIST = Path(__file__).parent / 'frontend' / 'dist'
 DEPTH_OUTPUT_DIR = Path(__file__).parent / 'static' / 'generated-depth'
