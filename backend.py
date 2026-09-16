@@ -32,7 +32,7 @@ try:
     depth_estimator = pipeline('depth-estimation', model=DEPTH_MODEL)
     logging.getLogger(__name__).info('Depth estimation model loaded successfully: %s', DEPTH_MODEL)
 except Exception as error:
-    logging.getLogger(__name__).exception('Depth estimation model failed to load: %s', error)
+    logging.getLogger(__name__).warning('Depth estimation model unavailable: %s', error)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1_000 * 1024 * 1024
@@ -78,7 +78,7 @@ def file_metadata(upload, allowed_extensions):
                     'height': dataset.height,
                     'bands': dataset.count,
                 })
-        except (ImportError, Exception):
+        except Exception:
             # File hashing and validation still work when rasterio cannot decode a format.
             pass
 
@@ -394,13 +394,11 @@ def process_dem():
                 result['surveyAreaKm2'] = (absolute_width * pixel_width * absolute_height * pixel_height) / 1_000_000
             else:
                 result.pop('surveyAreaKm2', None)
-            calibrated_url = f'/static/calibrated-dem/{output_name}'
         elif relative_values is not None:
             result.update({
                 'meshTriangles': max(0, (relative_values.shape[1] - 1) * (relative_values.shape[0] - 1) * 2),
                 'resolution': 'relative image pixels',
             })
-            calibrated_url = None
         else:
             absolute_values, absolute_valid, _profile, crs, _transform, absolute_width, absolute_height, pixel_width, pixel_height = absolute_data
             valid_values = absolute_values[absolute_valid]
@@ -413,7 +411,6 @@ def process_dem():
             })
             if crs is not None and pixel_width and pixel_height:
                 result['surveyAreaKm2'] = (absolute_width * pixel_width * absolute_height * pixel_height) / 1_000_000
-            calibrated_url = None
 
         response = {
             'jobId': uuid.uuid4().hex,

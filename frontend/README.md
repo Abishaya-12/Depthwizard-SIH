@@ -154,7 +154,7 @@ frontend/src/api.ts        Frontend API client
 frontend/src/components/   Workflow, viewer, and flythrough screens
 frontend/src/types.ts      Shared frontend response types
 frontend/vite.config.ts    Vite configuration and API proxy
-static/                    Standalone renderer texture assets
+static/                    Runtime-generated DEM and calibrated raster files
 ```
 
 ## Current Scope

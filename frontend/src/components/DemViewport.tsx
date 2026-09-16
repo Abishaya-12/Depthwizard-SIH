@@ -32,11 +32,12 @@ export const DemViewport: React.FC<DemViewportProps> = ({
   // Shading settings
   const [solarAzimuth, setSolarAzimuth] = useState(315);
   const [solarZenith, setSolarZenith] = useState(42);
-  const [cursorAlt, setCursorAlt] = useState(1420);
+  const [cursorAlt, setCursorAlt] = useState<number | null>(null);
   const [cursorPinTop, setCursorPinTop] = useState(48);
   const minElevation = processingResult?.result.minElevationMeters;
   const maxElevation = processingResult?.result.maxElevationMeters;
   const formatElevation = (value?: number) => value === undefined ? '--m' : `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}m`;
+  const relief = processingResult?.result.maxReliefMeters;
 
   const isDraggingRef = useRef(false);
   const lastMouseRef = useRef({ x: 0, y: 0 });
@@ -118,7 +119,7 @@ export const DemViewport: React.FC<DemViewportProps> = ({
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, []);
+  }, [maxElevation, minElevation]);
 
   const setPreset = (pX: number, pZ: number) => {
     setRotX(pX);
@@ -406,7 +407,7 @@ export const DemViewport: React.FC<DemViewportProps> = ({
                 <div className="hidden sm:flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[16px] text-[#00e5ff]">height</span>
                   <span className="font-mono-coordinate text-[11px] text-[#bac9cc]">CURSOR ALT:</span>
-                  <span className="font-mono-telemetry text-[13px] text-white font-bold tracking-wider">{cursorAlt.toLocaleString()}m</span>
+                  <span className="font-mono-telemetry text-[13px] text-white font-bold tracking-wider">{formatElevation(cursorAlt ?? undefined)}</span>
                 </div>
               </div>
 
@@ -454,6 +455,31 @@ export const DemViewport: React.FC<DemViewportProps> = ({
 
         {/* Right Details & Mission Telemetry Panel (4 Cols) */}
         <div className="lg:col-span-4 flex flex-col gap-4">
+          {/* Actual elevation readout from the processed DEM */}
+          <div className="w-full bg-[#00e5ff]/10 backdrop-blur-xl rounded-xl p-4 shadow-xl border border-[#00e5ff]/30">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#00e5ff] text-[20px]">terrain</span>
+                <span className="font-headline-sm text-[18px] text-[#dce3f0] font-semibold">Elevation Profile</span>
+              </div>
+              <span className="font-label-caps text-[10px] text-[#4cd6fb] uppercase">ASL / m</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-[#080f18]/70 p-3 border border-[#3b494c]/30">
+                <span className="font-label-caps text-[10px] text-[#849396] uppercase">Peak</span>
+                <div className="font-mono-telemetry text-[18px] text-[#c3f5ff] font-bold">{formatElevation(maxElevation)}</div>
+              </div>
+              <div className="rounded-lg bg-[#080f18]/70 p-3 border border-[#3b494c]/30">
+                <span className="font-label-caps text-[10px] text-[#849396] uppercase">Base</span>
+                <div className="font-mono-telemetry text-[18px] text-[#c3f5ff] font-bold">{formatElevation(minElevation)}</div>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between font-mono-coordinate text-[11px]">
+              <span className="text-[#bac9cc]">Total relief</span>
+              <span className="text-[#00e5ff] font-bold">{formatElevation(relief)}</span>
+            </div>
+          </div>
+
           {/* Dataset Telemetry Glass Card */}
           <div className="w-full bg-[#151c26]/90 backdrop-blur-xl rounded-xl p-4 flex flex-col gap-3 shadow-xl border border-[#3b494c]/20">
             <div className="flex items-center justify-between pb-1">
@@ -470,7 +496,7 @@ export const DemViewport: React.FC<DemViewportProps> = ({
             <div className="flex flex-col rounded overflow-hidden bg-[#080f18]/60 border border-[#3b494c]/20">
               <div className="flex items-center justify-between p-2.5 bg-[#19202a]/30">
                 <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Dataset</span>
-                <span className="font-mono-telemetry text-[13px] text-[#dce3f0] font-semibold">CARTOSAT-3_STEREO_ABS_092</span>
+                <span className="font-mono-telemetry text-[13px] text-[#dce3f0] font-semibold truncate ml-4">{processingResult?.absolute?.name ?? processingResult?.relative?.name ?? 'Awaiting input'}</span>
               </div>
               <div className="flex items-center justify-between p-2.5">
                 <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Elevation Range</span>
@@ -478,45 +504,19 @@ export const DemViewport: React.FC<DemViewportProps> = ({
               </div>
               <div className="flex items-center justify-between p-2.5 bg-[#19202a]/30">
                 <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Spatial Res (GSD)</span>
-                <span className="font-mono-telemetry text-[13px] text-[#dce3f0]">0.28m GSD</span>
+                <span className="font-mono-telemetry text-[13px] text-[#dce3f0]">{processingResult?.result.resolution ?? 'Unavailable'}</span>
               </div>
               <div className="flex items-center justify-between p-2.5">
                 <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Coordinates</span>
-                <span className="font-mono-telemetry text-[13px] text-[#4cd6fb]">14°12'32"N, 76°24'11"E</span>
+                <span className="font-mono-telemetry text-[13px] text-[#4cd6fb]">Source metadata unavailable</span>
               </div>
               <div className="flex items-center justify-between p-2.5 bg-[#19202a]/30">
                 <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Datum</span>
-                <span className="font-mono-telemetry text-[13px] text-[#dce3f0]">WGS84 Ellipsoidal</span>
+                <span className="font-mono-telemetry text-[13px] text-[#dce3f0]">Source raster</span>
               </div>
               <div className="flex items-center justify-between p-2.5">
-                <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Slope Gradient</span>
-                <span className="font-mono-telemetry text-[13px] text-[#ffb4ab] font-semibold">Max 48.2° (Rim)</span>
-              </div>
-              <div className="flex items-center justify-between p-2.5 bg-[#19202a]/30">
-                <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Point Density</span>
-                <span className="font-mono-telemetry text-[13px] text-[#dce3f0]">12.8 pts / m²</span>
-              </div>
-            </div>
-
-            {/* Slope Distribution Histogram */}
-            <div className="flex flex-col gap-1 pt-1">
-              <div className="flex items-center justify-between">
-                <span className="font-label-caps text-[10px] text-[#bac9cc] uppercase">Slope Histogram (Deg)</span>
-                <span className="font-mono-coordinate text-[11px] text-[#c3f5ff]">Mean: 18.4°</span>
-              </div>
-              <div className="h-12 w-full bg-[#080f18] rounded p-1 flex items-end gap-1 border border-[#3b494c]/20">
-                <div className="w-1/12 bg-[#c3f5ff]/30 h-[25%] rounded-t"></div>
-                <div className="w-1/12 bg-[#c3f5ff]/40 h-[40%] rounded-t"></div>
-                <div className="w-1/12 bg-[#c3f5ff]/60 h-[75%] rounded-t"></div>
-                <div className="w-1/12 bg-[#00e5ff] h-[95%] rounded-t"></div>
-                <div className="w-1/12 bg-[#c3f5ff]/80 h-[80%] rounded-t"></div>
-                <div className="w-1/12 bg-[#c3f5ff]/70 h-[60%] rounded-t"></div>
-                <div className="w-1/12 bg-[#4cd6fb] h-[45%] rounded-t"></div>
-                <div className="w-1/12 bg-[#4cd6fb]/70 h-[30%] rounded-t"></div>
-                <div className="w-1/12 bg-[#4cd6fb]/50 h-[20%] rounded-t"></div>
-                <div className="w-1/12 bg-[#ffb4ab]/60 h-[35%] rounded-t"></div>
-                <div className="w-1/12 bg-[#ffb4ab]/80 h-[50%] rounded-t"></div>
-                <div className="w-1/12 bg-[#ffb4ab] h-[15%] rounded-t"></div>
+                <span className="font-mono-coordinate text-[11px] text-[#849396] uppercase">Calibration</span>
+                <span className="font-mono-telemetry text-[13px] text-[#dce3f0]">{processingResult?.result.calibrated ? 'Absolute / calibrated' : 'Relative or raw'}</span>
               </div>
             </div>
           </div>
