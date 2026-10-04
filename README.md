@@ -1,160 +1,153 @@
-<div align="center">
-<img width="1200" height="475" alt="DepthWizard logo" src="Logo.jpeg" />
-</div>
+<p align="center">
+  <img src="Logo.jpeg" alt="DepthWizard logo" width="160">
+</p>
 
 # DepthWizard
 
-DepthWizard is an interactive ISRO-inspired digital elevation model (DEM) workspace. It combines a React operations interface, a Flask upload API, and a shared Three.js terrain engine for inspecting generated terrain and flying through the same terrain path.
+**Single-photo height estimation, calibrated against real elevation data, with an interactive 3D terrain viewer and flythrough.**
 
-## What It Can Do
+Built for Smart India Hackathon 2026, Problem Statement 26175, by a five-member team led by Abishaya.
 
-- Guide an operator through a five-stage DEM workflow:
-   1. Welcome portal
-   2. DEM ingestion and configuration
-   3. Mesh processing telemetry
-   4. Interactive 3D DEM viewport
-   5. 3D terrain flythrough
-- Upload a relative DEM and an absolute/georeferenced DEM from the browser.
-- Validate supported file extensions and enforce the 1 GB combined upload limit.
-- Calculate SHA-256 hashes and file sizes on the backend.
-- Inspect raster dimensions and band counts when Rasterio can decode the uploaded format.
-- Return processing metadata to the frontend through a Flask JSON API.
-- Display backend-derived mesh triangles, survey area, relief range, interpolation method, and resolution in the mesh screen.
-- Generate a procedural 3D terrain surface with crater, ridge, and fine relief features.
-- Render the terrain with Three.js lighting, shading, grid references, wireframe mode, and elevation exaggeration.
-- Reuse the same terrain engine and generated Catmull-Rom path in the DEM viewer and flythrough screens.
-- Animate a flythrough camera along the shared path with autopilot and speed controls.
-- Provide viewer controls for camera presets, orbit rotation, render modes, solar settings, and terrain exaggeration.
-- Provide flythrough controls for chase, cockpit, orbit, and top-down modes, keyboard steering, autopilot, speed multipliers, and waypoint pinning.
-- Adapt the interface to desktop and mobile layouts.
+<!-- TODO: add a demo GIF here (upload photo -> depth map -> calibration -> 3D flythrough), 30 to 60 seconds -->
 
-## Architecture
+## What it does
 
-```text
-Browser
-   React/Vite frontend :3000
-          |
-          | /api proxy during development
-          v
-   Flask backend :5000
-          |
-          +-- validates and hashes uploads
-          +-- reads raster metadata with Rasterio when available
+Most depth models output *relative* depth: they know what is nearer or farther, but not by how many meters. DepthWizard turns that relative depth into **metric elevation** by anchoring it to a real elevation reference.
 
-src/script.js
-   Shared Three.js terrain engine
-          +-- generated terrain mesh
-          +-- lighting and grid
-          +-- shared flythrough path
-          +-- viewer and flythrough animation lifecycle
+1. **Estimate depth** from one RGB photo with a pretrained Depth-Anything-V2 model.
+2. **Get a reference** either by uploading your own georeferenced DEM or by drawing a bounding box and downloading SRTM elevation data from OpenTopography.
+3. **Calibrate** the relative depth map against the reference with robust regression, and report validation error in meters.
+4. **Export** a calibrated GeoTIFF and **explore** it in a Three.js viewer and first-person flythrough.
+
+```mermaid
+flowchart LR
+    A[RGB photo] --> B[Depth-Anything-V2<br/>relative depth]
+    B --> C[Bilateral filter +<br/>percentile normalisation]
+    D[Uploaded DEM<br/>or SRTM via OpenTopography] --> E
+    C --> E[Huber regression<br/>calibration]
+    E --> F[Calibrated GeoTIFF<br/>+ RMSE / MAE / correlation]
+    F --> G[Three.js viewer<br/>and flythrough]
 ```
 
-The authoritative 3D terrain and flythrough logic lives in [`src/script.js`](src/script.js). The React screens import `createTerrainEngine` rather than maintaining separate terrain renderers. The React HUD and workflow state remain in `frontend/src`.
+## Screenshots
 
-## Requirements
+<!-- TODO: add 2 to 3 screenshots: depth map result, calibration metrics screen, 3D viewer, flythrough -->
 
-- Node.js 18 or newer
-- Python 3.10 or newer
-- A browser with WebGL support
+## How the pipeline works
 
-Python dependencies are listed in [`requirements.txt`](requirements.txt). Frontend dependencies are listed in [`package.json`](package.json).
+### 1. Depth estimation: `POST /api/estimate-depth`
+- Runs `depth-anything/Depth-Anything-V2-Small-hf` (pretrained, not fine-tuned) through the Hugging Face `transformers` depth-estimation pipeline.
+- Applies an OpenCV **bilateral filter** to reduce texture noise while keeping real edges.
+- Clips to the 2nd to 98th percentile and normalises to 0 to 1, then returns an 8-bit grayscale relative depth map.
 
-## Setup
+### 2. Reference elevation: `POST /api/fetch-dem-by-bbox`
+- Takes `south`, `north`, `west`, `east` (a box drawn on the map in the UI).
+- Downloads **SRTM GL1 (about 30 m)** elevation for that box from the OpenTopography API as a GeoTIFF.
+- Validates the box (valid ranges, at most 2 degrees per side) and returns a preview image.
+- Requires an `OPENTOPOGRAPHY_API_KEY`.
 
-From the repository root:
+### 3. Calibration: `POST /api/process-dem`
+- Resamples the reference DEM to the relative depth map's grid (bilinear) and keeps pixels valid in both.
+- Fits a **Huber regression** (`elevation = a * relative_depth + b`), which resists outliers better than ordinary least squares.
+- Uses an **80/20 train/test split** and reports validation metrics on the held-out pixels:
+  - `rmseMeters`
+  - `maeMeters`
+  - `correlationCoefficient`
+- Writes a calibrated, compressed **GeoTIFF** (`int16`, with nodata handling) and returns elevation summary, mesh triangle count, resolution and survey area.
 
-```powershell
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/health` | GET | Service health check |
+| `/api/estimate-depth` | POST | RGB photo (`rgb_image`) to relative depth map |
+| `/api/fetch-dem-by-bbox` | POST | Bounding box to SRTM GeoTIFF |
+| `/api/process-dem` | POST | Relative depth (`relative_dem`, PNG) + reference (`absolute_dem`) to calibrated GeoTIFF and metrics |
+
+### 4. 3D visualisation
+A shared Three.js terrain engine (`src/script.js`) powers two screens:
+- **DEM viewport:** orbit camera, camera presets, wireframe/render modes, solar settings and elevation exaggeration.
+- **Flythrough:** chase, cockpit, orbit and top-down cameras, WASD steering, autopilot along a Catmull-Rom path, speed multipliers and waypoint pinning.
+
+The React interface guides the user through five stages: welcome, DEM ingestion, mesh telemetry, 3D viewport, flythrough. It adapts to desktop and mobile layouts.
+
+## Tech stack
+
+| Layer | Tools |
+|---|---|
+| Backend | Python, Flask, NumPy, SciPy, scikit-learn, OpenCV, Rasterio, Hugging Face Transformers |
+| Frontend | React, TypeScript, Vite, Three.js |
+| Data | SRTM GL1 via OpenTopography |
+| Model | Depth-Anything-V2-Small (pretrained) |
+
+## Getting started
+
+**Requirements:** Node.js 18+, Python 3.10+, a WebGL-capable browser.
+
+```bash
+# from the repository root
 python -m pip install -r requirements.txt
 npm install
-Copy-Item .env.example .env
+cp .env.example .env        # Windows PowerShell: Copy-Item .env.example .env
 ```
 
-`npm install` is run from the repository root. The root npm workspace installs the
-frontend dependencies from `frontend/package.json`, including Vite, in one step.
-The copied `.env` file is local-only and is ignored by Git. Add an
-`OPENTOPOGRAPHY_API_KEY` there only if you use the bounding-box DEM download.
-For another computer, copy the `.env` file securely or create it again from
-`.env.example`; never commit it.
+Add `OPENTOPOGRAPHY_API_KEY` to `.env` only if you want the bounding-box DEM download. The `.env` file is git-ignored; never commit it.
 
-## Run Locally
-
-```powershell
+```bash
 npm start
 ```
 
-The production frontend is built automatically and Flask serves the complete app at
-`http://127.0.0.1:5000`.
+This builds the frontend and Flask serves the full app at `http://127.0.0.1:5000`. The first run downloads the depth model, so it takes longer.
 
-The normal runtime does not require Vite to be running. Vite is used only during
-the build, so deployment needs `npm install`, `npm run build`, and the Python
-dependencies; Flask then serves `frontend/dist`.
+### Useful commands
 
-For a deployment environment, configure `OPENTOPOGRAPHY_API_KEY`, `HOST`, and
-`PORT` as platform environment variables instead of committing a `.env` file.
-Start the server with:
-
-```powershell
-python backend.py
+```bash
+npm run lint                          # TypeScript check
+npm run build                         # production build
+npm run --workspace frontend dev      # Vite dev server with API proxy
+python backend.py                     # run the Flask server directly
 ```
 
-## Frontend Commands
+For deployment, set `OPENTOPOGRAPHY_API_KEY`, `HOST` and `PORT` as platform environment variables.
 
-Run these from the repository root:
+## Results
 
-```powershell
-npm run lint                         # Run the TypeScript check
-npm run build                        # Create a production build
-npm run --workspace frontend dev     # Start Vite with API proxy for development
-npm run --workspace frontend preview # Preview the production build
+<!-- TODO: fill in from your real runs. Example format:
+| Scene | Reference | RMSE (m) | MAE (m) | Correlation |
+|---|---|---|---|---|
+| ...   | SRTM 30 m | ...      | ...     | ...         |
+-->
+
+## Limitations
+
+Being upfront about what this does and does not do:
+
+- **No fine-tuning.** The depth model is the stock pretrained Depth-Anything-V2-Small. It was not fine-tuned on aerial or building-height data (for example GAMUS), which is the biggest gap against the problem statement.
+- **Domain mismatch.** General monocular depth models are trained mostly on ground-level scenes. On top-down imagery they can show texture noise and render buildings as ramps instead of blocks. Filtering reduces this but does not remove it.
+- **SRTM resolution.** SRTM is about 30 m per pixel, so it can calibrate regional height but cannot resolve building-scale detail. It is used as a calibration anchor, not as ground truth for fine structure.
+- **Optimistic validation.** The held-out test pixels are drawn at random from the same image, so they sit next to the training pixels. Treat the reported error as an upper bound on accuracy, not a measure of generalisation to a new scene.
+- **Single linear fit.** Calibration assumes a linear relationship between relative depth and elevation across the whole image.
+
+## Roadmap
+
+- Fix photo-texture draping on the terrain mesh (currently in progress)
+- Validate on a spatially held-out region and on a second scene
+- Fine-tune the depth model on aerial imagery
+- Per-region calibration instead of a single global fit
+
+## Project structure
+
 ```
-
-## API
-
-### Health check
-
-```http
-GET /api/health
-```
-
-Example response:
-
-```json
-{
-   "status": "ok",
-   "service": "depthwizard-dem-api"
-}
-```
-
-### Process DEM files
-
-```http
-POST /api/process-dem
-Content-Type: multipart/form-data
-```
-
-Required form fields:
-
-- `relative_dem`: `.tif`, `.tiff`, `.img`, `.hdf5`, `.h5`, or `.dem`
-- `absolute_dem`: `.dem`, `.tif`, `.tiff`, `.las`, or `.laz`
-
-The response includes a generated job ID, validation status, metadata for both files, and the processing result used by the mesh telemetry screen. Files are written to temporary storage only while they are inspected and are removed after the request finishes.
-
-## Project Layout
-
-```text
-backend.py                 Flask upload and metadata API
+backend.py                 Flask API: depth estimation, DEM fetch, calibration
 requirements.txt           Python dependencies
 src/script.js              Shared Three.js terrain and flythrough engine
-src/index.html             Standalone legacy Three.js page
-src/style.css              Standalone renderer styles
 frontend/src/App.tsx       React workflow shell
 frontend/src/api.ts        Frontend API client
-frontend/src/components/   Workflow, viewer, and flythrough screens
-frontend/src/types.ts      Shared frontend response types
-frontend/vite.config.ts    Vite configuration and API proxy
-static/                    Runtime-generated DEM and calibrated raster files
+frontend/src/components/   Workflow, viewer and flythrough screens
+frontend/vite.config.ts    Vite config and API proxy
+static/                    Generated depth maps and calibrated rasters
 ```
 
-## Current Scope
+## Acknowledgements
 
-The Flask endpoint currently validates, hashes, and inspects uploads, then returns the processing metadata contract used by the UI. The Three.js engine currently generates a procedural terrain surface and shared flythrough path. A production raster-to-mesh pipeline can replace the backend result generation while preserving the existing frontend API contract and engine mount points.
+- [Depth Anything V2](https://github.com/DepthAnything/Depth-Anything-V2) for the pretrained depth model
+- [OpenTopography](https://opentopography.org/) for SRTM data access
+- Smart India Hackathon 2026, Problem Statement 26175
